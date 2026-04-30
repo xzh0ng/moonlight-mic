@@ -939,6 +939,22 @@ Flickable {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Mutes Moonlight's audio when you Alt+Tab out of the stream or click on a different window.")
                 }
+
+                CheckBox {
+                    id: streamMicCheck
+                    width: parent.width
+                    text: qsTr("Stream client microphone to host")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.streamMicToHost
+                    onCheckedChanged: {
+                        StreamingPreferences.streamMicToHost = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Send your microphone audio to the host. The host must be running a build that supports this. Takes effect at the start of the next stream.")
+                }
             }
         }
 

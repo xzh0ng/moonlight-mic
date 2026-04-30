@@ -1200,6 +1200,16 @@
         <source>Automatically detect blocked connections (Recommended)</source>
         <translation>Erkenne automatisch geblockte Verbindungen (empfohlen)</translation>
     </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="946"/>
+        <source>Stream client microphone to host</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="956"/>
+        <source>Send your microphone audio to the host. The host must be running a build that supports this. Takes effect at the start of the next stream.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>StreamSegue</name>
