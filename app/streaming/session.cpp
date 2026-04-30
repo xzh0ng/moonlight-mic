@@ -1265,6 +1265,14 @@ private:
         // LiStartConnection() and LiStopConnection().
         SDL_assert(m_Session->m_VideoDecoder == nullptr);
 
+        // Tear down MicAudioSender before stopping the connection — the sender
+        // calls LiSendMicAudioFrame() which requires an active mc-c session.
+        if (m_Session->m_MicAudioSender) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Tearing down MicAudioSender");
+            m_Session->m_MicAudioSender->stop();
+            m_Session->m_MicAudioSender.reset();
+        }
+
         // Finish cleanup of the connection state
         LiStopConnection();
 
@@ -1687,6 +1695,20 @@ bool Session::startConnectionAsync()
         // We already displayed an error dialog in the stage failure
         // listener.
         return false;
+    }
+
+    // Start mic passthrough if the user has enabled the toggle AND the host
+    // advertised SS_FF_MIC_INPUT support. Short-circuit on toggle off so we
+    // never allocate capture/encode resources for users who haven't opted in.
+    if (m_Preferences->streamMicToHost
+            && (LiGetHostFeatureFlags() & SS_FF_MIC_INPUT)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Starting MicAudioSender");
+        m_MicAudioSender = std::make_unique<MicAudioSender>();
+        if (!m_MicAudioSender->start()) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "MicAudioSender::start() failed — mic passthrough disabled for this session");
+            m_MicAudioSender.reset();
+        }
     }
 
     emit connectionStarted();

@@ -9,7 +9,10 @@
 #include "input/input.h"
 #include "video/decoder.h"
 #include "audio/renderers/renderer.h"
+#include "audio/MicAudioSender.h"
 #include "video/overlaymanager.h"
+
+#include <memory>
 
 class SupportedVideoFormatList : public QList<int>
 {
@@ -278,6 +281,8 @@ private:
     OPUS_MULTISTREAM_CONFIGURATION m_OriginalAudioConfig;
     int m_AudioSampleCount;
     Uint32 m_DropAudioEndTime;
+
+    std::unique_ptr<MicAudioSender> m_MicAudioSender;
 
     Overlay::OverlayManager m_OverlayManager;
 
