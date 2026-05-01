@@ -1700,8 +1700,7 @@ bool Session::startConnectionAsync()
     // Start mic passthrough if the user has enabled the toggle AND the host
     // advertised SS_FF_MIC_INPUT support. Short-circuit on toggle off so we
     // never allocate capture/encode resources for users who haven't opted in.
-    if (m_Preferences->streamMicToHost
-            && (LiGetHostFeatureFlags() & SS_FF_MIC_INPUT)) {
+    if (shouldStartMicSender(m_Preferences, LiGetHostFeatureFlags())) {
         SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Starting MicAudioSender");
         m_MicAudioSender = std::make_unique<MicAudioSender>();
         if (!m_MicAudioSender->start()) {
@@ -2374,4 +2373,10 @@ DispatchDeferredCleanup:
     // When it is complete, it will release our s_ActiveSessionSemaphore
     // reference.
     QThreadPool::globalInstance()->start(new DeferredSessionCleanupTask(this));
+}
+
+// C4 — gate helper extracted from startConnectionAsync() for testability.
+bool Session::shouldStartMicSender(const StreamingPreferences* prefs, uint32_t hostFlags)
+{
+    return prefs->streamMicToHost && ((hostFlags & SS_FF_MIC_INPUT) != 0);
 }

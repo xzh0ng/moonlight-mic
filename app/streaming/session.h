@@ -185,6 +185,12 @@ private:
                                                StreamingPreferences::VideoDecoderSelection vds,
                                                int videoFormat, int width, int height, int frameRate);
 
+    // C4 — testable gate for mic-sender startup.
+    // Returns true iff both the user toggle and the host capability flag are set.
+    // Extracted from startConnectionAsync() so the logic can be exercised by
+    // QtTest without spinning up a real streaming session.
+    static bool shouldStartMicSender(const StreamingPreferences* prefs, uint32_t hostFlags);
+
     static
     bool chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
                        SDL_Window* window, int videoFormat, int width, int height,
