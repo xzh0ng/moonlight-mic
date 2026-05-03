@@ -153,6 +153,24 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         SDL_PushEvent(&quitExitEvent);
         break;
 
+#ifdef DEBUG_MIC_AB_CAPTURE
+    case KeyComboMicABCapture:
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Detected mic A/B capture combo (DEBUG_MIC_AB_CAPTURE)");
+        // SdlInputHandler is friend of Session — direct access to the
+        // unique_ptr is fine. Capture is silently a no-op if the user did
+        // not enable mic streaming for this session.
+        if (Session::get() != nullptr && Session::get()->m_MicAudioSender) {
+            Session::get()->m_MicAudioSender->armDebugCapture();
+        }
+        else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Mic A/B capture: no active MicAudioSender (mic toggle off, "
+                        "or host did not advertise SS_FF_MIC_INPUT)");
+        }
+        break;
+#endif
+
     default:
         Q_UNREACHABLE();
     }

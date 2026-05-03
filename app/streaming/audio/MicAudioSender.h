@@ -8,6 +8,10 @@
 #include "SDL_compat.h"
 #include <opus.h>
 
+#ifdef DEBUG_MIC_AB_CAPTURE
+#include <cstdio>
+#endif
+
 // MicAudioSender — client-side mic capture + Opus encode + LiSendMicAudioFrame pipeline.
 //
 // Lifecycle: construct → start() → (worker thread runs) → stop() → destroy.
@@ -43,6 +47,21 @@ public:
     bool start();
     void stop();
 
+#ifdef DEBUG_MIC_AB_CAPTURE
+    // armDebugCapture — debug A/B capture trigger (UPSTREAM-PR DEFENSIVE NOTE:
+    // entire feature is compiled out unless DEBUG_MIC_AB_CAPTURE is defined at
+    // build time; see docs/development/mic-ab-capture.md). Called from the
+    // SDL input thread (KeyComboMicABCapture); arms the worker to write
+    // pre-encode PCM samples to a WAV file at the configured output dir for
+    // kDebugCaptureSeconds. Lock-free: a single std::atomic flag flips the
+    // worker into capture mode on its next iteration. Idempotent — calling
+    // while a capture is in progress is a no-op (returns false).
+    //
+    // Returns true if capture started, false if a capture is already in
+    // progress or the output dir/file could not be opened.
+    bool armDebugCapture();
+#endif
+
 private:
     void runWorker();
 
@@ -50,4 +69,13 @@ private:
     OpusEncoder*       m_Encoder;
     std::thread        m_WorkerThread;
     std::atomic<bool>  m_Stopping;
+
+#ifdef DEBUG_MIC_AB_CAPTURE
+    // Debug A/B capture state. All access happens on the worker thread except
+    // m_DebugCaptureArmed which is the lock-free arm signal from armDebugCapture().
+    // Production builds don't compile this in: zero size, zero branches.
+    std::atomic<bool> m_DebugCaptureArmed{false};
+    FILE*             m_DebugCaptureFile = nullptr;       // owned by worker
+    std::uint32_t     m_DebugCaptureSamplesWritten = 0;   // worker-local counter
+#endif
 };

@@ -570,3 +570,14 @@ macx {
 
 VERSION = "$$cat(version.txt)"
 DEFINES += VERSION_STR=\\\"$$cat(version.txt)\\\"
+
+# moonlight-mic debug A/B capture instrumentation.
+# Enabled at qmake time with: qmake CONFIG+=debug-mic-ab-capture
+# When the CONFIG flag is absent (the default), DEBUG_MIC_AB_CAPTURE is not
+# defined; all related code is removed by the preprocessor and the production
+# audio path is unchanged. See docs/development/mic-ab-capture.md (in the
+# moonlight-mic umbrella repo) for the full workflow.
+debug-mic-ab-capture {
+    message(Mic A/B capture instrumentation ENABLED)
+    DEFINES += DEBUG_MIC_AB_CAPTURE
+}

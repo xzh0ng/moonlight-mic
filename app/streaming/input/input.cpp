@@ -116,6 +116,15 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     m_SpecialKeyCombos[KeyComboQuitAndExit].scanCode = SDL_SCANCODE_E;
     m_SpecialKeyCombos[KeyComboQuitAndExit].enabled = true;
 
+#ifdef DEBUG_MIC_AB_CAPTURE
+    // Debug-only mic A/B capture trigger. Bound to Ctrl+Alt+Shift+R ("R" for
+    // "record"); compiled out unless DEBUG_MIC_AB_CAPTURE is set at qmake time.
+    m_SpecialKeyCombos[KeyComboMicABCapture].keyCombo = KeyComboMicABCapture;
+    m_SpecialKeyCombos[KeyComboMicABCapture].keyCode = SDLK_r;
+    m_SpecialKeyCombos[KeyComboMicABCapture].scanCode = SDL_SCANCODE_R;
+    m_SpecialKeyCombos[KeyComboMicABCapture].enabled = true;
+#endif
+
     m_OldIgnoreDevices = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES);
     m_OldIgnoreDevicesExcept = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT);
 
