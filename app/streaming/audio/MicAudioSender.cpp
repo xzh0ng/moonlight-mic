@@ -326,6 +326,37 @@ bool MicAudioSender::armDebugCapture()
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "MicAudioSender: debug capture ARMED (will capture next %d s of pre-encode mic samples)",
                 kDebugCaptureSeconds);
+
+    // Also signal the host to start its capture by creating the `.arm` sentinel
+    // file in the configured capture directory. When MOONLIGHT_MIC_AB_CAPTURE_DIR
+    // points at a shared filesystem location (e.g. <your-drive>\... on JimothySnicket's setup,
+    // visible as <your-drive>\... on host-pc) and the host's APOLLO_MIC_AB_CAPTURE_DIR
+    // points at the same physical path, the host's polling loop sees the file
+    // within ~1 second and starts its own capture. Result: one trigger, two
+    // captures starting near-simultaneously.
+    //
+    // If MOONLIGHT_MIC_AB_CAPTURE_DIR is not set or doesn't resolve to a shared
+    // path, the .arm file lands locally on the client and the host won't see
+    // it — falls back to the prior workflow (manual SSH .arm creation).
+    std::string dir = resolveDebugCaptureDir();
+    if (!dir.empty()) {
+        std::string armPath = dir;
+        if (armPath.back() != '/' && armPath.back() != '\\') {
+            armPath.push_back('/');
+        }
+        armPath += ".arm";
+        FILE* f = std::fopen(armPath.c_str(), "wb");
+        if (f != nullptr) {
+            std::fclose(f);
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "MicAudioSender: wrote host trigger sentinel -> %s", armPath.c_str());
+        } else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "MicAudioSender: failed to write host trigger sentinel at %s "
+                        "(host won't auto-arm; create the .arm file manually if needed)",
+                        armPath.c_str());
+        }
+    }
     return true;
 }
 #endif
