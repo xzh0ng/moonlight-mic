@@ -46,10 +46,21 @@ if errorlevel 1 (
 set BUILD_DIR=<build-dir>\moonlight-qt-x64-release
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 
+rem Optional debug-mic-ab-capture flag (A1, 2026-05-03):
+rem   set DEBUG_MIC_AB_CAPTURE=1 (any non-empty value) before invoking this
+rem   script to build with the debug A/B capture instrumentation enabled.
+set EXTRA_QMAKE_CONFIG=
+if defined DEBUG_MIC_AB_CAPTURE (
+    if not "%DEBUG_MIC_AB_CAPTURE%"=="" (
+        set EXTRA_QMAKE_CONFIG=CONFIG+=debug-mic-ab-capture
+        echo Debug feature ENABLED: DEBUG_MIC_AB_CAPTURE
+    )
+)
+
 echo.
 echo qmake configure...
 pushd "%BUILD_DIR%"
-qmake "%SOURCE_ROOT%\moonlight-qt.pro" CONFIG+=release
+qmake "%SOURCE_ROOT%\moonlight-qt.pro" CONFIG+=release %EXTRA_QMAKE_CONFIG%
 if errorlevel 1 (
     echo qmake failed
     popd
