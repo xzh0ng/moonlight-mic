@@ -43,7 +43,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set BUILD_DIR=<build-dir>\moonlight-qt-x64-release
+rem Build output dir. Override by setting MOONLIGHT_MIC_BUILD_ROOT in the environment.
+if not defined MOONLIGHT_MIC_BUILD_ROOT set MOONLIGHT_MIC_BUILD_ROOT=C:\moonlight-mic-build
+set BUILD_DIR=%MOONLIGHT_MIC_BUILD_ROOT%\moonlight-qt-x64-release
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 
 rem Optional debug-mic-ab-capture flag (A1, 2026-05-03):
