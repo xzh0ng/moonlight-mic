@@ -11,6 +11,7 @@
 #include <Limelight.h>
 
 #include <algorithm>
+#include <cstring>
 
 #ifdef DEBUG_MIC_AB_CAPTURE
 #include <cstdio>
@@ -31,15 +32,23 @@ constexpr int    kFrameSamples = 960;   // 48000 Hz × 20 ms = 960 samples/frame
 // kFrameBytes: the exact number of bytes for one 20 ms mono s16 PCM frame.
 constexpr size_t kFrameBytes   = (size_t)kFrameSamples * kChannels * sizeof(opus_int16);
 
-// kBufBytes: heap buffer with overflow padding.
+// kBufBytes: PCM frame buffer size.
 //
-// SDL2-compat (the SDL2 shim over SDL3) has been observed returning MORE bytes
-// than requested from SDL_DequeueAudio(), which causes a stack buffer overrun
-// when the PCM frame is stack-allocated. Using a heap buffer with 256 bytes of
-// overflow padding absorbs any such over-delivery without corrupting adjacent
-// memory. See project SecondBrain landmine: "SDL2-compat — DequeueAudio returns
-// smaller chunks than requested" and the open thread in moonlight-mic.md.
+// pcmBuf holds exactly one decoded 20 ms frame after memcpy from the scratch
+// buffer. The +256 padding is defense-in-depth only — it is NOT the primary
+// safety mechanism against SDL_DequeueAudio over-delivery. The scratch buffer
+// (kScratchBytes, allocated in runWorker) is the structural fix: SDL writes
+// into scratch[], and memcpy clamps the copy into pcmBuf to at most to_read
+// bytes per iteration. See the dequeue loop comment in runWorker().
 constexpr size_t kBufBytes     = kFrameBytes + 256;
+
+// kScratchBytes: scratch buffer for SDL_DequeueAudio.
+//
+// SDL_DequeueAudio writes into this buffer — never directly into pcmBuf. Sized
+// generously so no documented or plausible sdl2-compat over-delivery can
+// overflow it. After each dequeue, exactly min(got, to_read) bytes are
+// memcpy'd into pcmBuf.
+constexpr size_t kScratchBytes = kFrameBytes * 2 + 4096;
 
 // Generously sized Opus output buffer. For VOIP at 48 kbit/s the actual encoded
 // speech frame is typically 60–150 bytes, but we must leave room for the
@@ -363,14 +372,18 @@ bool MicAudioSender::armDebugCapture()
 
 void MicAudioSender::runWorker()
 {
-    // HEAP-allocated PCM buffer.
+    // HEAP-allocated PCM buffer and scratch buffer.
     //
-    // Stack allocation is the suspected cause of the POC's STATUS_STACK_BUFFER_OVERRUN
-    // crash: sdl2-compat has been observed returning MORE bytes than requested from
-    // SDL_DequeueAudio(), overflowing a stack frame. The 256-byte overflow padding
-    // in kBufBytes absorbs any such over-delivery. Heap allocation also avoids
-    // eating thread stack space for the frame buffer.
+    // pcmBuf receives exactly one 20 ms frame of s16 PCM per encode iteration,
+    // written via memcpy from scratchBuf — never via SDL_DequeueAudio directly.
+    // Invariant: pcmBuf never receives more than to_read bytes per iteration.
+    //
+    // scratchBuf is the SDL_DequeueAudio target. It is large enough that no
+    // documented or plausible sdl2-compat over-delivery can overflow it. This is
+    // the structural fix for the heap-buffer-overflow bug where sdl2-compat
+    // delivers more bytes than requested, corrupting heap-adjacent objects.
     std::unique_ptr<uint8_t[]> pcmBuf(new uint8_t[kBufBytes]);
+    std::unique_ptr<uint8_t[]> scratchBuf(new uint8_t[kScratchBytes]);
     unsigned char opusBuf[kMaxOpusBytes];
     uint16_t seqNumber = 0;
 
@@ -396,13 +409,21 @@ void MicAudioSender::runWorker()
                 continue;
             }
             Uint32 to_read = static_cast<Uint32>(kFrameBytes - bytes_filled);
+            // SDL_DequeueAudio writes into scratchBuf[], never into pcmBuf directly.
+            // Invariant: pcmBuf never receives more than to_read bytes per iteration.
             Uint32 got = SDL_DequeueAudio(
                 m_CaptureDevice,
-                pcmBuf.get() + bytes_filled,
+                scratchBuf.get(),
                 to_read);
-            // Clamp: sdl2-compat may return MORE bytes than requested.
-            bytes_filled += std::min(static_cast<size_t>(got),
-                                     static_cast<size_t>(to_read));
+            if (got > to_read) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "MicAudioSender: SDL_DequeueAudio over-delivery: "
+                            "got=%u to_read=%u (clamped)",
+                            (unsigned)got, (unsigned)to_read);
+            }
+            Uint32 copy_size = std::min(got, to_read);
+            std::memcpy(pcmBuf.get() + bytes_filled, scratchBuf.get(), copy_size);
+            bytes_filled += copy_size;
         }
 
         if (m_Stopping.load(std::memory_order_relaxed)) {
