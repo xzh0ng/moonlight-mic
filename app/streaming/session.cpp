@@ -1252,12 +1252,11 @@ private:
                 !m_Session->m_UnexpectedTermination &&
                 m_Session->m_Preferences->quitAppAfter;
 
-        // Notify the UI
+        // Notify the UI before the potentially slow host-app quit path so the user
+        // can see progress. Normal stream-exit UI notification is deferred until
+        // cleanup is complete, because it re-enables SDL gamepad navigation.
         if (shouldQuit) {
             emit m_Session->quitStarting();
-        }
-        else {
-            emit m_Session->sessionFinished(m_Session->m_PortTestResults);
         }
 
         // The video decoder must already be destroyed, since it could
@@ -1287,6 +1286,10 @@ private:
             } catch (const QtNetworkReplyException&) {
             }
 
+            // Session is finished now
+            emit m_Session->sessionFinished(m_Session->m_PortTestResults);
+        }
+        else {
             // Session is finished now
             emit m_Session->sessionFinished(m_Session->m_PortTestResults);
         }
