@@ -1,3 +1,9 @@
+> **Branch: `moonlight-mic` — microphone passthrough for Sunshine + Moonlight.**
+>
+> Part of the [moonlight-mic](https://github.com/JimothySnicket/moonlight-mic) project: a coordinated change across `moonlight-common-c`, `moonlight-qt`, and `Apollo` that adds client-to-host microphone passthrough. See the umbrella for setup, design, and combined releases.
+
+---
+
 # Moonlight PC
 
 [Moonlight PC](https://moonlight-stream.org) is an open source PC client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).
