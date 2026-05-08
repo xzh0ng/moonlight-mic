@@ -20,6 +20,7 @@
 #include <QUuid>
 
 static const char* kStreamMicKey = "streammic";
+static const char* kMicCaptureDeviceKey = "miccapturedevice";
 
 class TstTogglePersistence : public QObject
 {
@@ -61,6 +62,7 @@ private slots:
         // Reset between sub-tests so they're independent.
         QSettings settings;
         settings.remove(kStreamMicKey);
+        settings.remove(kMicCaptureDeviceKey);
         settings.sync();
     }
 
@@ -106,6 +108,23 @@ private slots:
         }
         QSettings settings3;
         QCOMPARE(settings3.value(kStreamMicKey, false).toBool(), false);
+    }
+
+    // -----------------------------------------------------------------------
+    // Mic capture device: absent key means system default; a device name
+    // round-trips as an exact string for SDL_OpenAudioDevice().
+    // -----------------------------------------------------------------------
+    void test_micCaptureDevicePersistence()
+    {
+        QSettings settings;
+        QCOMPARE(settings.value(kMicCaptureDeviceKey, QString()).toString(), QString());
+
+        const QString deviceName = QStringLiteral("Microphone Array (Senary Audio)");
+        settings.setValue(kMicCaptureDeviceKey, deviceName);
+        settings.sync();
+
+        QSettings settings2;
+        QCOMPARE(settings2.value(kMicCaptureDeviceKey, QString()).toString(), deviceName);
     }
 };
 

@@ -1706,7 +1706,7 @@ bool Session::startConnectionAsync()
     if (shouldStartMicSender(m_Preferences, LiGetHostFeatureFlags())) {
         SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Starting MicAudioSender");
         m_MicAudioSender = std::make_unique<MicAudioSender>();
-        if (!m_MicAudioSender->start()) {
+        if (!m_MicAudioSender->start(m_Preferences->micCaptureDevice.toStdString())) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "MicAudioSender::start() failed — mic passthrough disabled for this session");
             m_MicAudioSender.reset();

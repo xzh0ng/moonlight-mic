@@ -1,5 +1,6 @@
 #include "streamingpreferences.h"
 #include "utils.h"
+#include "SDL_compat.h"
 
 #include <QSettings>
 #include <QTranslator>
@@ -52,6 +53,7 @@
 #define SER_KEEPAWAKE "keepawake"
 #define SER_LANGUAGE "language"
 #define SER_STREAMMIC "streammic"
+#define SER_MIC_CAPTURE_DEVICE "miccapturedevice"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -152,6 +154,7 @@ void StreamingPreferences::reload()
     swapFaceButtons = settings.value(SER_SWAPFACEBUTTONS, false).toBool();
     keepAwake = settings.value(SER_KEEPAWAKE, true).toBool();
     streamMicToHost = settings.value(SER_STREAMMIC, false).toBool();
+    micCaptureDevice = settings.value(SER_MIC_CAPTURE_DEVICE, QString()).toString();
     enableHdr = settings.value(SER_HDR, false).toBool();
     captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS,
                                                          static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
@@ -244,6 +247,38 @@ bool StreamingPreferences::retranslate()
     }
 
     return true;
+}
+
+QStringList StreamingPreferences::getMicCaptureDeviceNames() const
+{
+    QStringList devices;
+
+    const bool audioWasAlreadyInitialized = (SDL_WasInit(SDL_INIT_AUDIO) != 0);
+    if (!audioWasAlreadyInitialized && SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+        qWarning() << "Failed to initialize SDL audio while enumerating microphone devices:"
+                   << SDL_GetError();
+        return devices;
+    }
+
+    int count = SDL_GetNumAudioDevices(/*iscapture=*/1);
+    if (count < 0) {
+        qWarning() << "Failed to enumerate microphone devices:" << SDL_GetError();
+    }
+    else {
+        for (int i = 0; i < count; i++) {
+            const char* name = SDL_GetAudioDeviceName(i, /*iscapture=*/1);
+            if (name != nullptr && name[0] != '\0') {
+                devices.append(QString::fromUtf8(name));
+            }
+        }
+    }
+
+    if (!audioWasAlreadyInitialized) {
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    }
+
+    devices.removeDuplicates();
+    return devices;
 }
 
 QString StreamingPreferences::getSuffixFromLanguage(StreamingPreferences::Language lang)
@@ -361,6 +396,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
     settings.setValue(SER_STREAMMIC, streamMicToHost);
+    settings.setValue(SER_MIC_CAPTURE_DEVICE, micCaptureDevice);
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

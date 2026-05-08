@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QRect>
 #include <QQmlEngine>
+#include <QStringList>
 
 class StreamingPreferences : public QObject
 {
@@ -141,6 +142,7 @@ public:
     Q_PROPERTY(bool muteOnFocusLoss MEMBER muteOnFocusLoss NOTIFY muteOnFocusLossChanged)
     Q_PROPERTY(bool backgroundGamepad MEMBER backgroundGamepad NOTIFY backgroundGamepadChanged)
     Q_PROPERTY(bool streamMicToHost MEMBER streamMicToHost NOTIFY streamMicToHostChanged)
+    Q_PROPERTY(QString micCaptureDevice MEMBER micCaptureDevice NOTIFY micCaptureDeviceChanged)
     Q_PROPERTY(bool reverseScrollDirection MEMBER reverseScrollDirection NOTIFY reverseScrollDirectionChanged)
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
     Q_PROPERTY(bool keepAwake MEMBER keepAwake NOTIFY keepAwakeChanged)
@@ -148,6 +150,7 @@ public:
     Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged);
 
     Q_INVOKABLE bool retranslate();
+    Q_INVOKABLE QStringList getMicCaptureDeviceNames() const;
 
     // Directly accessible members for preferences
     int width;
@@ -178,6 +181,7 @@ public:
     bool swapFaceButtons;
     bool keepAwake;
     bool streamMicToHost;
+    QString micCaptureDevice;
     int packetSize;
     AudioConfig audioConfig;
     VideoCodecConfig videoCodecConfig;
@@ -226,6 +230,7 @@ signals:
     void captureSysKeysModeChanged();
     void keepAwakeChanged();
     void streamMicToHostChanged();
+    void micCaptureDeviceChanged();
     void languageChanged();
 
 private:

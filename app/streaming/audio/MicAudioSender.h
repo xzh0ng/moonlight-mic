@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <thread>
 
 #include "SDL_compat.h"
@@ -17,12 +18,12 @@
 // Lifecycle: construct → start() → (worker thread runs) → stop() → destroy.
 // Destructor calls stop() automatically if not already called.
 //
-// start() opens the default SDL2 capture device, creates an Opus encoder, and
-// spawns a worker thread that captures 20 ms frames at 48 kHz mono, encodes
-// each frame with libopus, and calls LiSendMicAudioFrame() with a monotonically
-// increasing sequence number. Returns false on any initialisation failure (no
-// capture device, Opus init error, etc.); the object is left clean and stop()
-// is a no-op.
+// start() opens the selected SDL2 capture device (or the system default when
+// no device name is provided), creates an Opus encoder, and spawns a worker
+// thread that captures 20 ms frames at 48 kHz mono, encodes each frame with
+// libopus, and calls LiSendMicAudioFrame() with a monotonically increasing
+// sequence number. Returns false on any initialisation failure (no capture
+// device, Opus init error, etc.); the object is left clean and stop() is a no-op.
 //
 // stop() signals the worker to exit, joins it, and tears down all SDL2 and
 // Opus resources. Safe to call if start() failed or was never called.
@@ -44,7 +45,7 @@ public:
     MicAudioSender(const MicAudioSender&) = delete;
     MicAudioSender& operator=(const MicAudioSender&) = delete;
 
-    bool start();
+    bool start(const std::string& captureDeviceName = std::string());
     void stop();
 
 #ifdef DEBUG_MIC_AB_CAPTURE

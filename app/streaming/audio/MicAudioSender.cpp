@@ -11,13 +11,14 @@
 #include <Limelight.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
+#include <string>
 
 #ifdef DEBUG_MIC_AB_CAPTURE
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
-#include <string>
 #include <SDL_filesystem.h>
 #endif
 
@@ -75,6 +76,61 @@ constexpr int    kMaxOpusBytes = 1500;
 // Reference: moonlight-mic.md open thread "POC SDL2 fix may have stack-overrun
 // bug" and plan question "Encoder configuration sweet spot".
 constexpr int kBitrate = 48000;
+
+bool containsCaseInsensitive(const std::string& haystack, const char* needle)
+{
+    const std::string needleString(needle);
+    return std::search(
+        haystack.begin(), haystack.end(),
+        needleString.begin(), needleString.end(),
+        [](char a, char b) {
+            return std::tolower(static_cast<unsigned char>(a)) ==
+                   std::tolower(static_cast<unsigned char>(b));
+        }) != haystack.end();
+}
+
+void logCaptureDevices()
+{
+#if SDL_VERSION_ATLEAST(2, 24, 0)
+    char* defaultCaptureName = nullptr;
+    SDL_AudioSpec defaultCaptureSpec;
+    SDL_zero(defaultCaptureSpec);
+    if (SDL_GetDefaultAudioInfo(&defaultCaptureName, &defaultCaptureSpec, /*iscapture=*/1) == 0) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "MicAudioSender: default capture device: %s "
+                    "(freq=%d fmt=0x%04x ch=%u samples=%u)",
+                    defaultCaptureName != nullptr ? defaultCaptureName : "<unknown>",
+                    defaultCaptureSpec.freq,
+                    (unsigned)defaultCaptureSpec.format,
+                    (unsigned)defaultCaptureSpec.channels,
+                    (unsigned)defaultCaptureSpec.samples);
+    }
+    else {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "MicAudioSender: SDL_GetDefaultAudioInfo(capture) failed: %s",
+                    SDL_GetError());
+    }
+    if (defaultCaptureName != nullptr) {
+        SDL_free(defaultCaptureName);
+    }
+#endif
+
+    int captureDeviceCount = SDL_GetNumAudioDevices(/*iscapture=*/1);
+    if (captureDeviceCount < 0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "MicAudioSender: SDL_GetNumAudioDevices(capture) failed: %s",
+                    SDL_GetError());
+        return;
+    }
+
+    for (int i = 0; i < captureDeviceCount; i++) {
+        const char* name = SDL_GetAudioDeviceName(i, /*iscapture=*/1);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "MicAudioSender: capture device[%d]: %s",
+                    i,
+                    name != nullptr ? name : "<unknown>");
+    }
+}
 
 #ifdef DEBUG_MIC_AB_CAPTURE
 // --- Debug A/B capture ---------------------------------------------------
@@ -195,7 +251,7 @@ MicAudioSender::~MicAudioSender()
     stop();
 }
 
-bool MicAudioSender::start()
+bool MicAudioSender::start(const std::string& captureDeviceName)
 {
     SDL_assert(m_CaptureDevice == 0);
     SDL_assert(m_Encoder == nullptr);
@@ -207,6 +263,38 @@ bool MicAudioSender::start()
                     "MicAudioSender: SDL_InitSubSystem(AUDIO) failed: %s",
                     SDL_GetError());
         return false;
+    }
+
+    logCaptureDevices();
+
+    std::string effectiveCaptureDeviceName = captureDeviceName;
+    if (const char* envCaptureDeviceName = SDL_getenv("MOONLIGHT_MIC_CAPTURE_DEVICE")) {
+        if (envCaptureDeviceName[0] != '\0') {
+            effectiveCaptureDeviceName = envCaptureDeviceName;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "MicAudioSender: using MOONLIGHT_MIC_CAPTURE_DEVICE override: %s",
+                        effectiveCaptureDeviceName.c_str());
+        }
+    }
+
+    const char* captureDeviceNamePtr =
+        effectiveCaptureDeviceName.empty() ? nullptr : effectiveCaptureDeviceName.c_str();
+
+    if (!effectiveCaptureDeviceName.empty()) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "MicAudioSender: requested capture device: %s",
+                    effectiveCaptureDeviceName.c_str());
+        if (containsCaseInsensitive(effectiveCaptureDeviceName, "hands-free") ||
+                containsCaseInsensitive(effectiveCaptureDeviceName, "headset")) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "MicAudioSender: selected capture device appears to be a Bluetooth "
+                        "hands-free/headset endpoint; opening it can force local headset "
+                        "playback into low-quality call mode");
+        }
+    }
+    else {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "MicAudioSender: requested capture device: <system default>");
     }
 
     // Request: 48 kHz, mono, signed 16-bit, pull mode (callback=nullptr).
@@ -221,10 +309,11 @@ bool MicAudioSender::start()
     want.callback = nullptr;    // pull mode
 
     m_CaptureDevice = SDL_OpenAudioDevice(
-        /*device=*/nullptr, /*iscapture=*/1, &want, &have, /*allowed_changes=*/0);
+        captureDeviceNamePtr, /*iscapture=*/1, &want, &have, /*allowed_changes=*/0);
     if (m_CaptureDevice == 0) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "MicAudioSender: SDL_OpenAudioDevice(capture) failed: %s",
+                    "MicAudioSender: SDL_OpenAudioDevice(capture, %s) failed: %s",
+                    captureDeviceNamePtr != nullptr ? captureDeviceNamePtr : "<system default>",
                     SDL_GetError());
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return false;
@@ -256,7 +345,9 @@ bool MicAudioSender::start()
     }
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "MicAudioSender: capture device opened (freq=%d fmt=0x%04x ch=%u samples=%u)",
+                "MicAudioSender: capture device opened: %s "
+                "(freq=%d fmt=0x%04x ch=%u samples=%u)",
+                captureDeviceNamePtr != nullptr ? captureDeviceNamePtr : "<system default>",
                 have.freq, (unsigned)have.format,
                 (unsigned)have.channels, (unsigned)have.samples);
 

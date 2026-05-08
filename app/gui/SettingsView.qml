@@ -955,6 +955,71 @@ Flickable {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Send your microphone audio to the host. The host must be running a build that supports this. Takes effect at the start of the next stream.")
                 }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Microphone")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                    visible: streamMicCheck.checked
+                }
+
+                AutoResizingComboBox {
+                    function rebuildModel() {
+                        micCaptureDeviceListModel.clear()
+                        micCaptureDeviceListModel.append({
+                            text: qsTr("System default"),
+                            val: ""
+                        })
+
+                        var savedDevice = StreamingPreferences.micCaptureDevice
+                        var savedDeviceFound = savedDevice === ""
+                        var devices = StreamingPreferences.getMicCaptureDeviceNames()
+                        for (var i = 0; i < devices.length; i++) {
+                            micCaptureDeviceListModel.append({
+                                text: devices[i],
+                                val: devices[i]
+                            })
+                            if (savedDevice === devices[i]) {
+                                savedDeviceFound = true
+                            }
+                        }
+
+                        if (!savedDeviceFound) {
+                            micCaptureDeviceListModel.append({
+                                text: qsTr("%1 (Unavailable)").arg(savedDevice),
+                                val: savedDevice
+                            })
+                        }
+
+                        currentIndex = 0
+                        for (var j = 0; j < micCaptureDeviceListModel.count; j++) {
+                            if (micCaptureDeviceListModel.get(j).val === savedDevice) {
+                                currentIndex = j
+                                break
+                            }
+                        }
+                        recalculateWidth()
+                    }
+
+                    Component.onCompleted: rebuildModel()
+
+                    id: micCaptureDeviceComboBox
+                    visible: streamMicCheck.checked
+                    enabled: streamMicCheck.checked
+                    textRole: "text"
+                    model: ListModel {
+                        id: micCaptureDeviceListModel
+                    }
+                    onActivated: {
+                        StreamingPreferences.micCaptureDevice = micCaptureDeviceListModel.get(currentIndex).val
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Choose a built-in or USB microphone to avoid switching Bluetooth headphones into hands-free call mode.")
+                }
             }
         }
 
