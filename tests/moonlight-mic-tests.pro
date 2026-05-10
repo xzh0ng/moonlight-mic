@@ -1,5 +1,5 @@
 QT += core testlib
-CONFIG += c++17 console testcase
+CONFIG += c++17 console testcase debug_and_release
 CONFIG -= app_bundle
 
 TARGET = moonlight-mic-tests
