@@ -1802,14 +1802,9 @@ void Session::start()
 
     // Initialize the gamepad code with our preferences
     // NB: m_InputHandler must be initialize before starting the connection.
-    bool forceAbsoluteMouseMode = false;
-#ifdef Q_OS_DARWIN
-    forceAbsoluteMouseMode = DisplayInputController::isRemoteInputAudioApplication(m_App.name);
-#endif
     m_InputHandler = new SdlInputHandler(*m_Preferences,
                                          m_StreamConfig.width,
-                                         m_StreamConfig.height,
-                                         forceAbsoluteMouseMode);
+                                         m_StreamConfig.height);
 
     // Kick off the async connection thread then return to the caller to pump the event loop
     auto thread = new AsyncConnectionStartThread(this);

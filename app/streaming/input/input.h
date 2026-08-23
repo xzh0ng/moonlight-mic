@@ -84,10 +84,7 @@ struct DualSenseOutputReport{
 class SdlInputHandler
 {
 public:
-    explicit SdlInputHandler(StreamingPreferences& prefs,
-                             int streamWidth,
-                             int streamHeight,
-                             bool forceAbsoluteMouseMode = false);
+    explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight);
 
     ~SdlInputHandler();
 

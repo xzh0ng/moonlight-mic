@@ -11,8 +11,10 @@ and adds local monitor input switching directly to Moonlight.
 - Other Moonlight applications never trigger an automatic display switch.
 - `Command-Control-G` switches display index 1 to DP1.
 - `Option-Control-G` switches display index 1 to HDMI 1.
-- **Remote Input + Audio** starts in remote-desktop/absolute mouse mode by
-  default. `Control-Option-Shift-M` can still toggle back to relative mode.
+- **Remote Input + Audio** honors Moonlight's normal mouse preference. Leave
+  **Optimize mouse for remote desktop instead of games** disabled for relative
+  mouse input and unrestricted camera turning in games. `Control-Option-Shift-M`
+  remains available as a temporary in-stream mode toggle.
 - After `Option-Control-G` switches to HDMI 1, Moonlight cleanly ends only the
   active stream and returns to its normal UI. Moonlight and Apollo stay open,
   making it quick to launch **Remote Input + Audio** again.
