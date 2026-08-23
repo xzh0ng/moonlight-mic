@@ -17,6 +17,7 @@ SOURCES += \
     tst_toggle_persistence.cpp \
     tst_gate_logic.cpp \
     tst_mic_lifecycle.cpp \
+    tst_display_input_policy.cpp \
     stub_limelight.cpp \
     gate_helper_impl.cpp \
     ../app/streaming/audio/MicAudioSender.cpp

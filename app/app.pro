@@ -153,8 +153,11 @@ macx {
         CONFIG += discord-rpc
     }
 
-    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework Metal -framework QuartzCore
+    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework Carbon -framework Metal -framework QuartzCore
     CONFIG += ffmpeg
+
+    OBJECTIVE_SOURCES += platform/macos/displayinputcontroller.mm
+    HEADERS += platform/macos/displayinputcontroller.h
 }
 
 SOURCES += \
@@ -236,6 +239,8 @@ HEADERS += \
     gui/sdlgamepadkeynavigation.h \
     streaming/video/overlaymanager.h \
     backend/systemproperties.h
+
+HEADERS += platform/displayinputpolicy.h
 
 # Platform-specific renderers and decoders
 ffmpeg {
@@ -570,14 +575,3 @@ macx {
 
 VERSION = "$$cat(version.txt)"
 DEFINES += VERSION_STR=\\\"$$cat(version.txt)\\\"
-
-# moonlight-mic debug A/B capture instrumentation.
-# Enabled at qmake time with: qmake CONFIG+=debug-mic-ab-capture
-# When the CONFIG flag is absent (the default), DEBUG_MIC_AB_CAPTURE is not
-# defined; all related code is removed by the preprocessor and the production
-# audio path is unchanged. See docs/development/mic-ab-capture.md (in the
-# moonlight-mic umbrella repo) for the full workflow.
-debug-mic-ab-capture {
-    message(Mic A/B capture instrumentation ENABLED)
-    DEFINES += DEBUG_MIC_AB_CAPTURE
-}

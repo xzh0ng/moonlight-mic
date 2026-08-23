@@ -54,6 +54,10 @@
 #include "settings/streamingpreferences.h"
 #include "gui/sdlgamepadkeynavigation.h"
 
+#ifdef Q_OS_DARWIN
+#include "platform/macos/displayinputcontroller.h"
+#endif
+
 #if defined(Q_OS_WIN32)
 #define IS_UNSPECIFIED_HANDLE(x) ((x) == INVALID_HANDLE_VALUE || (x) == NULL)
 
@@ -752,6 +756,12 @@ int main(int argc, char *argv[])
     }
 
     QGuiApplication app(argc, argv);
+
+#ifdef Q_OS_DARWIN
+    // Register the G2724D hotkeys from Moonlight itself. This prevents macOS
+    // from attributing Moonlight's CoreAudio request to an external launcher.
+    DisplayInputController displayInputController(&app);
+#endif
 
 #ifdef Q_OS_UNIX
     // Register signal handlers to arbitrate between SDL and Qt.

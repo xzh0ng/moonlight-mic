@@ -128,6 +128,14 @@ public:
 
     void setShouldExit(bool quitHostApp = false);
 
+    // End only the current stream and return to the Moonlight UI. The host
+    // application and Moonlight process remain running unless requested.
+    void endSession(bool quitHostApp = false);
+
+    // Bring the active SDL streaming window to the front. Used by the macOS
+    // display-input controller immediately before switching the monitor to DP1.
+    void raiseStreamingWindow();
+
 signals:
     void stageStarting(QString stage);
 

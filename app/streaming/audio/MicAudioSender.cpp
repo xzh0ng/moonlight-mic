@@ -15,13 +15,6 @@
 #include <cstring>
 #include <string>
 
-#ifdef DEBUG_MIC_AB_CAPTURE
-#include <cstdio>
-#include <cstdlib>
-#include <ctime>
-#include <SDL_filesystem.h>
-#endif
-
 namespace {
 
 // --- Audio constants -------------------------------------------------------
@@ -76,6 +69,60 @@ constexpr int    kMaxOpusBytes = 1500;
 // Reference: moonlight-mic.md open thread "POC SDL2 fix may have stack-overrun
 // bug" and plan question "Encoder configuration sweet spot".
 constexpr int kBitrate = 48000;
+constexpr int kEncoderComplexity = 10;
+
+bool logEncoderCtlResult(const char* operation, int result)
+{
+    if (result != OPUS_OK) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "MicAudioSender: %s failed: %d (%s)",
+                    operation, result, opus_strerror(result));
+        return false;
+    }
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "MicAudioSender: %s succeeded", operation);
+    return true;
+}
+
+bool configureEncoder(OpusEncoder* encoder, int& effectiveBitrate)
+{
+    bool success = true;
+    success &= logEncoderCtlResult(
+        "OPUS_SET_BITRATE(48000)",
+        opus_encoder_ctl(encoder, OPUS_SET_BITRATE(kBitrate)));
+    success &= logEncoderCtlResult(
+        "OPUS_SET_COMPLEXITY(10)",
+        opus_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(kEncoderComplexity)));
+    success &= logEncoderCtlResult(
+        "OPUS_SET_VBR(1)",
+        opus_encoder_ctl(encoder, OPUS_SET_VBR(1)));
+    success &= logEncoderCtlResult(
+        "OPUS_SET_VBR_CONSTRAINT(0)",
+        opus_encoder_ctl(encoder, OPUS_SET_VBR_CONSTRAINT(0)));
+    success &= logEncoderCtlResult(
+        "OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE)",
+        opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE)));
+
+    effectiveBitrate = 0;
+    const int getBitrateResult = opus_encoder_ctl(
+        encoder, OPUS_GET_BITRATE(&effectiveBitrate));
+    success &= logEncoderCtlResult("OPUS_GET_BITRATE", getBitrateResult);
+    if (getBitrateResult == OPUS_OK) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "MicAudioSender: effective Opus bitrate: %d bit/s",
+                    effectiveBitrate);
+        if (effectiveBitrate != kBitrate) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "MicAudioSender: effective Opus bitrate mismatch "
+                        "(requested=%d effective=%d)",
+                        kBitrate, effectiveBitrate);
+            success = false;
+        }
+    }
+
+    return success;
+}
 
 bool containsCaseInsensitive(const std::string& haystack, const char* needle)
 {
@@ -131,109 +178,6 @@ void logCaptureDevices()
                     name != nullptr ? name : "<unknown>");
     }
 }
-
-#ifdef DEBUG_MIC_AB_CAPTURE
-// --- Debug A/B capture ---------------------------------------------------
-//
-// Compiled in only when DEBUG_MIC_AB_CAPTURE is defined at build time.
-// The feature taps the pre-encode PCM stream into a WAV file for offline
-// A/B comparison against the host-side post-decode WAV (Apollo's matching
-// debug feature). See docs/development/mic-ab-capture.md.
-
-constexpr int    kDebugCaptureSeconds   = 10;
-constexpr size_t kDebugCaptureFrameCount = (size_t)kDebugCaptureSeconds * (1000 / 20);  // 500 frames
-constexpr size_t kDebugCaptureSamples    = kDebugCaptureFrameCount * (size_t)kFrameSamples;  // 480000
-
-// Resolve the debug capture output directory.
-//
-// Resolution order (mirroring the host-side env var convention so the
-// workflow doc can describe one knob):
-//   1. MOONLIGHT_MIC_AB_CAPTURE_DIR env var, if set.
-//   2. SDL_GetPrefPath("moonlight-mic", "ab-capture") — cross-platform user dir.
-//
-// Returns an empty string only if SDL_GetPrefPath fails, which is unusual.
-std::string resolveDebugCaptureDir() {
-    if (const char* env = std::getenv("MOONLIGHT_MIC_AB_CAPTURE_DIR")) {
-        if (env[0] != '\0') {
-            return std::string(env);
-        }
-    }
-    char* prefPath = SDL_GetPrefPath("moonlight-mic", "ab-capture");
-    if (prefPath == nullptr) {
-        return std::string();
-    }
-    std::string out(prefPath);
-    SDL_free(prefPath);
-    return out;
-}
-
-// Build a timestamped WAV filename: client-pre-encode-YYYYMMDD-HHMMSS.wav.
-std::string buildDebugCapturePath(const std::string& dir) {
-    std::time_t now = std::time(nullptr);
-    std::tm tmBuf;
-#ifdef _WIN32
-    localtime_s(&tmBuf, &now);
-#else
-    localtime_r(&now, &tmBuf);
-#endif
-    char stamp[32];
-    std::snprintf(stamp, sizeof(stamp),
-                  "%04d%02d%02d-%02d%02d%02d",
-                  tmBuf.tm_year + 1900, tmBuf.tm_mon + 1, tmBuf.tm_mday,
-                  tmBuf.tm_hour, tmBuf.tm_min, tmBuf.tm_sec);
-    std::string path = dir;
-    if (!path.empty() && path.back() != '/' && path.back() != '\\') {
-        path.push_back('/');
-    }
-    path += "client-pre-encode-";
-    path += stamp;
-    path += ".wav";
-    return path;
-}
-
-// Write a 44-byte WAV header for 48 kHz mono signed-16-bit PCM with the
-// given total sample count. Format reference: http://soundfile.sapp.org/doc/WaveFormat/
-// Numbers are written little-endian, which is the WAV file format convention
-// and matches s16 PCM byte order on every platform we ship to.
-void writeWavHeader(FILE* f, std::uint32_t sampleCount) {
-    auto write_u32_le = [&](std::uint32_t v) {
-        unsigned char b[4] = {
-            static_cast<unsigned char>(v & 0xff),
-            static_cast<unsigned char>((v >> 8) & 0xff),
-            static_cast<unsigned char>((v >> 16) & 0xff),
-            static_cast<unsigned char>((v >> 24) & 0xff),
-        };
-        std::fwrite(b, 1, 4, f);
-    };
-    auto write_u16_le = [&](std::uint16_t v) {
-        unsigned char b[2] = {
-            static_cast<unsigned char>(v & 0xff),
-            static_cast<unsigned char>((v >> 8) & 0xff),
-        };
-        std::fwrite(b, 1, 2, f);
-    };
-
-    const std::uint32_t bytesPerSample = (std::uint32_t)kChannels * sizeof(opus_int16);  // 2
-    const std::uint32_t dataChunkBytes = sampleCount * bytesPerSample;
-    const std::uint32_t riffChunkBytes = 36 + dataChunkBytes;
-
-    std::fwrite("RIFF", 1, 4, f);
-    write_u32_le(riffChunkBytes);
-    std::fwrite("WAVE", 1, 4, f);
-
-    std::fwrite("fmt ", 1, 4, f);
-    write_u32_le(16);                               // PCM fmt chunk size
-    write_u16_le(1);                                // PCM format
-    write_u16_le((std::uint16_t)kChannels);         // 1 channel
-    write_u32_le((std::uint32_t)kSampleRate);       // 48000 Hz
-    write_u32_le((std::uint32_t)kSampleRate * bytesPerSample);  // byte rate
-    write_u16_le((std::uint16_t)bytesPerSample);    // block align
-    write_u16_le(16);                               // bits per sample
-
-    std::fwrite("data", 1, 4, f);
-    write_u32_le(dataChunkBytes);
-}
-#endif  // DEBUG_MIC_AB_CAPTURE
 
 }  // namespace
 
@@ -333,9 +277,11 @@ bool MicAudioSender::start(const std::string& captureDeviceName)
         return false;
     }
 
-    if (opus_encoder_ctl(m_Encoder, OPUS_SET_BITRATE(kBitrate)) != OPUS_OK) {
+    int effectiveBitrate = 0;
+    if (!configureEncoder(m_Encoder, effectiveBitrate)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "MicAudioSender: OPUS_SET_BITRATE(%d) failed", kBitrate);
+                    "MicAudioSender: refusing to start with incomplete or "
+                    "incorrect Opus encoder configuration");
         opus_encoder_destroy(m_Encoder);
         m_Encoder = nullptr;
         SDL_CloseAudioDevice(m_CaptureDevice);
@@ -343,7 +289,6 @@ bool MicAudioSender::start(const std::string& captureDeviceName)
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return false;
     }
-
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "MicAudioSender: capture device opened: %s "
                 "(freq=%d fmt=0x%04x ch=%u samples=%u)",
@@ -360,8 +305,9 @@ bool MicAudioSender::start(const std::string& captureDeviceName)
     m_WorkerThread = std::thread(&MicAudioSender::runWorker, this);
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "MicAudioSender: started (48 kHz mono, VOIP, 20 ms, %d kbit/s)",
-                kBitrate / 1000);
+                "MicAudioSender: started (48 kHz mono s16, VOIP, 20 ms, "
+                "effective bitrate %d bit/s, complexity %d, unconstrained VBR, voice signal)",
+                effectiveBitrate, kEncoderComplexity);
     return true;
 }
 
@@ -390,76 +336,10 @@ void MicAudioSender::stop()
         m_Encoder = nullptr;
     }
 
-#ifdef DEBUG_MIC_AB_CAPTURE
-    // The worker thread has joined; m_DebugCaptureFile is no longer being
-    // touched. If a partial capture was in progress, finalize the WAV with
-    // whatever samples we got.
-    if (m_DebugCaptureFile != nullptr) {
-        std::fseek(m_DebugCaptureFile, 0, SEEK_SET);
-        writeWavHeader(m_DebugCaptureFile, m_DebugCaptureSamplesWritten);
-        std::fclose(m_DebugCaptureFile);
-        m_DebugCaptureFile = nullptr;
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "MicAudioSender: debug capture finalised on stop (partial: %u samples)",
-                    m_DebugCaptureSamplesWritten);
-        m_DebugCaptureSamplesWritten = 0;
-        m_DebugCaptureArmed.store(false, std::memory_order_release);
-    }
-#endif
-
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "MicAudioSender: stopped");
 }
-
-#ifdef DEBUG_MIC_AB_CAPTURE
-bool MicAudioSender::armDebugCapture()
-{
-    // Already armed or capture in progress on the worker side: ignore.
-    bool expected = false;
-    if (!m_DebugCaptureArmed.compare_exchange_strong(expected, true,
-                                                     std::memory_order_acq_rel)) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "MicAudioSender: debug capture already armed/in progress, ignoring trigger");
-        return false;
-    }
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "MicAudioSender: debug capture ARMED (will capture next %d s of pre-encode mic samples)",
-                kDebugCaptureSeconds);
-
-    // Also signal the host to start its capture by creating the `.arm` sentinel
-    // file in the configured capture directory. When MOONLIGHT_MIC_AB_CAPTURE_DIR
-    // points at a shared filesystem location (e.g. <your-drive>\... on JimothySnicket's setup,
-    // visible as <your-drive>\... on host-pc) and the host's APOLLO_MIC_AB_CAPTURE_DIR
-    // points at the same physical path, the host's polling loop sees the file
-    // within ~1 second and starts its own capture. Result: one trigger, two
-    // captures starting near-simultaneously.
-    //
-    // If MOONLIGHT_MIC_AB_CAPTURE_DIR is not set or doesn't resolve to a shared
-    // path, the .arm file lands locally on the client and the host won't see
-    // it — falls back to the prior workflow (manual SSH .arm creation).
-    std::string dir = resolveDebugCaptureDir();
-    if (!dir.empty()) {
-        std::string armPath = dir;
-        if (armPath.back() != '/' && armPath.back() != '\\') {
-            armPath.push_back('/');
-        }
-        armPath += ".arm";
-        FILE* f = std::fopen(armPath.c_str(), "wb");
-        if (f != nullptr) {
-            std::fclose(f);
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "MicAudioSender: wrote host trigger sentinel -> %s", armPath.c_str());
-        } else {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "MicAudioSender: failed to write host trigger sentinel at %s "
-                        "(host won't auto-arm; create the .arm file manually if needed)",
-                        armPath.c_str());
-        }
-    }
-    return true;
-}
-#endif
 
 void MicAudioSender::runWorker()
 {
@@ -476,9 +356,13 @@ void MicAudioSender::runWorker()
     std::unique_ptr<uint8_t[]> pcmBuf(new uint8_t[kBufBytes]);
     std::unique_ptr<uint8_t[]> scratchBuf(new uint8_t[kScratchBytes]);
     unsigned char opusBuf[kMaxOpusBytes];
+    OpusEncoder* const encoder = m_Encoder;
     uint16_t seqNumber = 0;
     bool firstCapturedFrameLogged = false;
     bool firstSentFrameLogged = false;
+
+    SDL_assert(encoder != nullptr);
+    SDL_assert(encoder == m_Encoder);
 
     while (!m_Stopping.load(std::memory_order_relaxed)) {
         // --- Accumulate a full 20 ms frame across as many SDL_DequeueAudio
@@ -534,65 +418,16 @@ void MicAudioSender::runWorker()
                         (unsigned)kFrameBytes);
         }
 
-#ifdef DEBUG_MIC_AB_CAPTURE
-        // Pre-encode capture tap. Pure write of raw s16 PCM samples — no
-        // re-routing of the encoder pipeline. Even when DEBUG_MIC_AB_CAPTURE
-        // is compiled in, the hot path adds at most an atomic load + a
-        // conditional branch when no capture is armed. When the flag is not
-        // defined at build time, this entire block is removed by the
-        // preprocessor.
-        if (m_DebugCaptureArmed.load(std::memory_order_acquire)) {
-            // First-time entry into a capture window: open the WAV file.
-            if (m_DebugCaptureFile == nullptr) {
-                std::string dir = resolveDebugCaptureDir();
-                if (dir.empty()) {
-                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                                "MicAudioSender: debug capture: SDL_GetPrefPath failed; "
-                                "set MOONLIGHT_MIC_AB_CAPTURE_DIR to override");
-                    m_DebugCaptureArmed.store(false, std::memory_order_release);
-                } else {
-                    std::string path = buildDebugCapturePath(dir);
-                    m_DebugCaptureFile = std::fopen(path.c_str(), "wb");
-                    if (m_DebugCaptureFile == nullptr) {
-                        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                                    "MicAudioSender: debug capture: fopen('%s') failed",
-                                    path.c_str());
-                        m_DebugCaptureArmed.store(false, std::memory_order_release);
-                    } else {
-                        // Provisional header; rewritten with final sample count
-                        // when we close.
-                        writeWavHeader(m_DebugCaptureFile, 0);
-                        m_DebugCaptureSamplesWritten = 0;
-                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                    "MicAudioSender: debug capture STARTED -> %s",
-                                    path.c_str());
-                    }
-                }
-            }
-            if (m_DebugCaptureFile != nullptr) {
-                std::fwrite(pcmBuf.get(), 1, kFrameBytes, m_DebugCaptureFile);
-                m_DebugCaptureSamplesWritten += kFrameSamples;
-                if (m_DebugCaptureSamplesWritten >= kDebugCaptureSamples) {
-                    // Capture window complete. Rewrite the header with the
-                    // actual sample count and close.
-                    std::fseek(m_DebugCaptureFile, 0, SEEK_SET);
-                    writeWavHeader(m_DebugCaptureFile, m_DebugCaptureSamplesWritten);
-                    std::fclose(m_DebugCaptureFile);
-                    m_DebugCaptureFile = nullptr;
-                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                "MicAudioSender: debug capture COMPLETE (%u samples = %d s)",
-                                m_DebugCaptureSamplesWritten, kDebugCaptureSeconds);
-                    m_DebugCaptureSamplesWritten = 0;
-                    m_DebugCaptureArmed.store(false, std::memory_order_release);
-                }
-            }
-        }
-#endif
+        // The capture device was opened with allowed_changes=0, so this buffer
+        // contains exactly 960 native-endian signed 16-bit mono samples at 48 kHz.
+        SDL_assert(bytes_filled == kFrameBytes);
+        const opus_int16* const pcmSamples =
+            reinterpret_cast<const opus_int16*>(pcmBuf.get());
 
-        // Encode the PCM frame.
+        // Encode with the same encoder instance configured in start().
         opus_int32 encodedLen = opus_encode(
-            m_Encoder,
-            reinterpret_cast<const opus_int16*>(pcmBuf.get()),
+            encoder,
+            pcmSamples,
             kFrameSamples,
             opusBuf,
             static_cast<opus_int32>(sizeof(opusBuf)));

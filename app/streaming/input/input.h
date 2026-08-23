@@ -84,7 +84,10 @@ struct DualSenseOutputReport{
 class SdlInputHandler
 {
 public:
-    explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight);
+    explicit SdlInputHandler(StreamingPreferences& prefs,
+                             int streamWidth,
+                             int streamHeight,
+                             bool forceAbsoluteMouseMode = false);
 
     ~SdlInputHandler();
 
@@ -167,12 +170,6 @@ private:
         KeyComboPasteText,
         KeyComboTogglePointerRegionLock,
         KeyComboQuitAndExit,
-#ifdef DEBUG_MIC_AB_CAPTURE
-        // Debug-only: trigger client-side mic A/B capture (Ctrl+Alt+Shift+R).
-        // Compiled out unless DEBUG_MIC_AB_CAPTURE is defined at build time.
-        // See docs/development/mic-ab-capture.md.
-        KeyComboMicABCapture,
-#endif
         KeyComboMax
     };
 

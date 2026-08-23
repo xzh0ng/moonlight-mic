@@ -9,7 +9,10 @@
 #include <QDir>
 #include <QGuiApplication>
 
-SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight)
+SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs,
+                                 int streamWidth,
+                                 int streamHeight,
+                                 bool forceAbsoluteMouseMode)
     : m_MultiController(prefs.multiController),
       m_GamepadMouse(prefs.gamepadMouse),
       m_SwapMouseButtons(prefs.swapMouseButtons),
@@ -25,7 +28,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_LongPressTimer(0),
       m_StreamWidth(streamWidth),
       m_StreamHeight(streamHeight),
-      m_AbsoluteMouseMode(prefs.absoluteMouseMode),
+      m_AbsoluteMouseMode(forceAbsoluteMouseMode || prefs.absoluteMouseMode),
       m_AbsoluteTouchMode(prefs.absoluteTouchMode),
       m_DisabledTouchFeedback(false),
       m_LeftButtonReleaseTimer(0),
@@ -34,6 +37,11 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_DragButton(0),
       m_NumFingersDown(0)
 {
+    if (forceAbsoluteMouseMode && !prefs.absoluteMouseMode) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Input: enabling remote-desktop mouse mode for Remote Input + Audio");
+    }
+
     // System keys are always captured when running without a DE
     if (!WMUtils::isRunningDesktopEnvironment()) {
         m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
@@ -115,15 +123,6 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     m_SpecialKeyCombos[KeyComboQuitAndExit].keyCode = SDLK_e;
     m_SpecialKeyCombos[KeyComboQuitAndExit].scanCode = SDL_SCANCODE_E;
     m_SpecialKeyCombos[KeyComboQuitAndExit].enabled = true;
-
-#ifdef DEBUG_MIC_AB_CAPTURE
-    // Debug-only mic A/B capture trigger. Bound to Ctrl+Alt+Shift+R ("R" for
-    // "record"); compiled out unless DEBUG_MIC_AB_CAPTURE is set at qmake time.
-    m_SpecialKeyCombos[KeyComboMicABCapture].keyCombo = KeyComboMicABCapture;
-    m_SpecialKeyCombos[KeyComboMicABCapture].keyCode = SDLK_r;
-    m_SpecialKeyCombos[KeyComboMicABCapture].scanCode = SDL_SCANCODE_R;
-    m_SpecialKeyCombos[KeyComboMicABCapture].enabled = true;
-#endif
 
     m_OldIgnoreDevices = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES);
     m_OldIgnoreDevicesExcept = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT);

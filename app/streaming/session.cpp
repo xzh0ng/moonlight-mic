@@ -41,6 +41,10 @@
 #include <QCursor>
 #include <QScreen>
 
+#ifdef Q_OS_DARWIN
+#include "platform/macos/displayinputcontroller.h"
+#endif
+
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QQuickOpenGLUtils>
 #endif
@@ -1720,6 +1724,22 @@ bool Session::startConnectionAsync()
         }
     }
 
+#ifdef Q_OS_DARWIN
+    // Queue the monitor switch onto the Qt main thread. The controller applies
+    // its own exact application-name gate and 500 ms post-connect delay.
+    if (DisplayInputController::isRemoteInputAudioApplication(m_App.name)) {
+        DisplayInputController* controller = DisplayInputController::instance();
+        if (controller != nullptr) {
+            const QString applicationName = m_App.name;
+            QMetaObject::invokeMethod(controller,
+                                      [controller, applicationName]() {
+                                          controller->scheduleAutomaticSwitch(applicationName);
+                                      },
+                                      Qt::QueuedConnection);
+        }
+    }
+#endif
+
     emit connectionStarted();
     return true;
 }
@@ -1743,15 +1763,33 @@ void Session::flushWindowEvents()
 
 void Session::setShouldExit(bool quitHostApp)
 {
-    // If the caller has explicitly asked us to quit the host app,
-    // override whatever the preferences say and do it. If the
-    // caller doesn't override to force quit, let the preferences
-    // dictate what we do.
+    // Preserve the normal preference unless the caller explicitly forces the
+    // host application to quit too.
     if (quitHostApp) {
         m_Preferences->quitAppAfter = true;
     }
 
     m_ShouldExit = true;
+}
+
+void Session::endSession(bool quitHostApp)
+{
+    m_Preferences->quitAppAfter = quitHostApp;
+    m_ShouldExit = false;
+    interrupt();
+}
+
+void Session::raiseStreamingWindow()
+{
+    if (m_Window == nullptr) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Display input: stream window is not ready to be raised");
+        return;
+    }
+
+    SDL_RaiseWindow(m_Window);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Display input: raised streaming window before DP1 switch");
 }
 
 void Session::start()
@@ -1764,7 +1802,14 @@ void Session::start()
 
     // Initialize the gamepad code with our preferences
     // NB: m_InputHandler must be initialize before starting the connection.
-    m_InputHandler = new SdlInputHandler(*m_Preferences, m_StreamConfig.width, m_StreamConfig.height);
+    bool forceAbsoluteMouseMode = false;
+#ifdef Q_OS_DARWIN
+    forceAbsoluteMouseMode = DisplayInputController::isRemoteInputAudioApplication(m_App.name);
+#endif
+    m_InputHandler = new SdlInputHandler(*m_Preferences,
+                                         m_StreamConfig.width,
+                                         m_StreamConfig.height,
+                                         forceAbsoluteMouseMode);
 
     // Kick off the async connection thread then return to the caller to pump the event loop
     auto thread = new AsyncConnectionStartThread(this);
