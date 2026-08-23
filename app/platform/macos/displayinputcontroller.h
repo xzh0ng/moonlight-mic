@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QProcess>
+#include <QMetaObject>
 
 #include <optional>
 
@@ -33,6 +34,7 @@ public slots:
 private slots:
     void handleProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void handleProcessError(QProcess::ProcessError error);
+    void handleSessionFinished(int portTestResult);
 
 private:
     void registerGlobalHotkeys();
@@ -41,11 +43,13 @@ private:
     void startInputRequest(int inputValue, const char* reason);
     void startPendingRequest();
     void activateStreamingWindow();
+    void restoreMoonlightUi();
     QString locateM1ddc() const;
 
     QProcess m_Process;
     std::optional<int> m_PendingInput;
     QString m_PendingReason;
+    QMetaObject::Connection m_SessionFinishedConnection;
     void* m_EventHandler = nullptr;
     void* m_Dp1Hotkey = nullptr;
     void* m_HdmiHotkey = nullptr;

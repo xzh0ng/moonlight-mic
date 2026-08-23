@@ -3,9 +3,12 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QMetaObject>
+#include <QScreen>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QWindow>
 
 #include <Carbon/Carbon.h>
 #include <AppKit/AppKit.h>
@@ -122,6 +125,16 @@ void DisplayInputController::switchToHdmi1()
         if (session != nullptr) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "Display input: HDMI return requested; ending stream and keeping Moonlight open");
+            DisplayInputController* controller = DisplayInputController::instance();
+            if (controller != nullptr) {
+                QObject::disconnect(controller->m_SessionFinishedConnection);
+                controller->m_SessionFinishedConnection = QObject::connect(
+                    session,
+                    &Session::sessionFinished,
+                    controller,
+                    &DisplayInputController::handleSessionFinished,
+                    Qt::QueuedConnection);
+            }
             session->endSession(false);
         }
         else {
@@ -129,6 +142,18 @@ void DisplayInputController::switchToHdmi1()
                         "Display input: HDMI return requested without active session; Moonlight remains open");
         }
     });
+}
+
+void DisplayInputController::handleSessionFinished(int portTestResult)
+{
+    Q_UNUSED(portTestResult);
+    QObject::disconnect(m_SessionFinishedConnection);
+    m_SessionFinishedConnection = {};
+
+    // The G2724D topology changes when its active input changes. Wait for
+    // macOS to publish the newly online screen before moving and raising the
+    // Moonlight UI.
+    QTimer::singleShot(350, this, &DisplayInputController::restoreMoonlightUi);
 }
 
 void DisplayInputController::requestInput(int inputValue, const char* reason)
@@ -218,6 +243,56 @@ void DisplayInputController::activateStreamingWindow()
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Display input: DP1 requested without an active streaming window");
     }
+}
+
+void DisplayInputController::restoreMoonlightUi()
+{
+    const QList<QScreen*> screens = QGuiApplication::screens();
+    QScreen* targetScreen = QGuiApplication::primaryScreen();
+    if (targetScreen == nullptr || screens.isEmpty()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Display input: no online Mac screen available for Moonlight UI");
+        return;
+    }
+
+    for (QWindow* window : QGuiApplication::topLevelWindows()) {
+        if (window == nullptr || !window->isVisible()) {
+            continue;
+        }
+
+        if (!screens.contains(window->screen())) {
+            window->setScreen(targetScreen);
+        }
+
+        bool intersectsOnlineScreen = false;
+        for (QScreen* screen : screens) {
+            if (screen->availableGeometry().intersects(window->geometry())) {
+                intersectsOnlineScreen = true;
+                break;
+            }
+        }
+        if (!intersectsOnlineScreen) {
+            const QRect available = targetScreen->availableGeometry();
+            const QSize size = window->size().boundedTo(available.size());
+            window->resize(size);
+            window->setPosition(available.center() - QPoint(size.width() / 2,
+                                                            size.height() / 2));
+        }
+
+        window->show();
+        window->raise();
+        window->requestActivate();
+    }
+
+    [NSApp activateIgnoringOtherApps:YES];
+    for (NSWindow* window in [NSApp windows]) {
+        if ([window isVisible]) {
+            [window makeKeyAndOrderFront:nil];
+        }
+    }
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Display input: restored Moonlight UI on an online Mac screen");
 }
 
 QString DisplayInputController::locateM1ddc() const

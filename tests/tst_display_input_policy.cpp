@@ -25,6 +25,18 @@ private slots:
         QCOMPARE(DisplayInputPolicy::m1ddcArguments(DisplayInputPolicy::InputHdmi1),
                  QStringList({"display", "1", "set", "input", "17"}));
     }
+
+    void testRemoteInputAudioForcesRelativeMouseMode()
+    {
+        QVERIFY(!DisplayInputPolicy::useAbsoluteMouseMode(
+            QStringLiteral("Remote Input + Audio"), true));
+        QVERIFY(!DisplayInputPolicy::useAbsoluteMouseMode(
+            QStringLiteral("Remote Input + Audio"), false));
+        QVERIFY(DisplayInputPolicy::useAbsoluteMouseMode(
+            QStringLiteral("Desktop"), true));
+        QVERIFY(!DisplayInputPolicy::useAbsoluteMouseMode(
+            QStringLiteral("Desktop"), false));
+    }
 };
 
 int runDisplayInputPolicyTests(int argc, char** argv)

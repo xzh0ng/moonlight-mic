@@ -15,6 +15,14 @@ inline bool isRemoteInputAudioApplication(const QString& applicationName)
                                               Qt::CaseInsensitive) == 0;
 }
 
+inline bool useAbsoluteMouseMode(const QString& applicationName,
+                                 bool savedAbsoluteMouseMode)
+{
+    // The dedicated mode is used for both desktop control and games. Relative
+    // input is the only mode that permits unrestricted FPS camera movement.
+    return isRemoteInputAudioApplication(applicationName) ? false : savedAbsoluteMouseMode;
+}
+
 inline QStringList m1ddcArguments(int inputValue)
 {
     return {

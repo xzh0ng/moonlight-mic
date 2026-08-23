@@ -11,13 +11,15 @@ and adds local monitor input switching directly to Moonlight.
 - Other Moonlight applications never trigger an automatic display switch.
 - `Command-Control-G` switches display index 1 to DP1.
 - `Option-Control-G` switches display index 1 to HDMI 1.
-- **Remote Input + Audio** honors Moonlight's normal mouse preference. Leave
-  **Optimize mouse for remote desktop instead of games** disabled for relative
-  mouse input and unrestricted camera turning in games. `Control-Option-Shift-M`
-  remains available as a temporary in-stream mode toggle.
+- **Remote Input + Audio** always starts in relative/FPS mouse mode for
+  unrestricted camera turning, regardless of the saved global remote-desktop
+  mouse preference. `Control-Option-Shift-M` remains available as a temporary
+  in-stream mode toggle.
 - After `Option-Control-G` switches to HDMI 1, Moonlight cleanly ends only the
   active stream and returns to its normal UI. Moonlight and Apollo stay open,
   making it quick to launch **Remote Input + Audio** again.
+- After the stream ends, Moonlight waits for macOS to publish the HDMI display,
+  moves its UI away from any offline screen, and raises it on the Mac desktop.
 - DP1 is DDC input value 15; HDMI 1 is DDC input value 17.
 - Monitor commands are serialized and executed directly without a shell.
 - The packaged app contains the MIT-licensed `m1ddc` 1.2.0 arm64 binary in
