@@ -17,7 +17,6 @@ class DisplayInputController : public QObject
 public:
     static constexpr int InputDp1 = DisplayInputPolicy::InputDp1;
     static constexpr int InputHdmi1 = DisplayInputPolicy::InputHdmi1;
-    static constexpr int DisplayIndex = DisplayInputPolicy::DisplayIndex;
 
     explicit DisplayInputController(QObject* parent = nullptr);
     ~DisplayInputController() override;

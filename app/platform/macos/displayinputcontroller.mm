@@ -181,8 +181,7 @@ void DisplayInputController::startInputRequest(int inputValue, const char* reaso
 
     const QStringList arguments = DisplayInputPolicy::m1ddcArguments(inputValue);
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Display input: switching display %d to input %d (%s)",
-                DisplayIndex,
+                "Display input: switching DELL G2724D by UUID to input %d (%s)",
                 inputValue,
                 reason);
     m_Process.setProgram(executable);
