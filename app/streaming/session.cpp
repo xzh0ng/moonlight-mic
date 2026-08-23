@@ -1700,10 +1700,17 @@ bool Session::startConnectionAsync()
         return false;
     }
 
+    const uint32_t hostFeatureFlags = LiGetHostFeatureFlags();
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "Microphone negotiation: enabled=%s hostFeatureFlags=0x%08x hostSupportsMic=%s",
+                m_Preferences->streamMicToHost ? "true" : "false",
+                hostFeatureFlags,
+                (hostFeatureFlags & SS_FF_MIC_INPUT) != 0 ? "true" : "false");
+
     // Start mic passthrough if the user has enabled the toggle AND the host
     // advertised SS_FF_MIC_INPUT support. Short-circuit on toggle off so we
     // never allocate capture/encode resources for users who haven't opted in.
-    if (shouldStartMicSender(m_Preferences, LiGetHostFeatureFlags())) {
+    if (shouldStartMicSender(m_Preferences, hostFeatureFlags)) {
         SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Starting MicAudioSender");
         m_MicAudioSender = std::make_unique<MicAudioSender>();
         if (!m_MicAudioSender->start(m_Preferences->micCaptureDevice.toStdString())) {

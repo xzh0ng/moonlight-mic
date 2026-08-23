@@ -477,6 +477,8 @@ void MicAudioSender::runWorker()
     std::unique_ptr<uint8_t[]> scratchBuf(new uint8_t[kScratchBytes]);
     unsigned char opusBuf[kMaxOpusBytes];
     uint16_t seqNumber = 0;
+    bool firstCapturedFrameLogged = false;
+    bool firstSentFrameLogged = false;
 
     while (!m_Stopping.load(std::memory_order_relaxed)) {
         // --- Accumulate a full 20 ms frame across as many SDL_DequeueAudio
@@ -523,6 +525,13 @@ void MicAudioSender::runWorker()
         if (bytes_filled != kFrameBytes) {
             // Partial frame on a non-stopping exit — shouldn't happen, skip.
             continue;
+        }
+
+        if (!firstCapturedFrameLogged) {
+            firstCapturedFrameLogged = true;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "MicAudioSender: captured first 20 ms PCM frame (%u bytes)",
+                        (unsigned)kFrameBytes);
         }
 
 #ifdef DEBUG_MIC_AB_CAPTURE
@@ -606,6 +615,13 @@ void MicAudioSender::runWorker()
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "MicAudioSender: LiSendMicAudioFrame returned %d (seq %u)",
                         sendResult, (unsigned)seqNumber);
+        }
+        else if (!firstSentFrameLogged) {
+            firstSentFrameLogged = true;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "MicAudioSender: submitted first 0x5510 Opus frame "
+                        "(seq=%u opusBytes=%d)",
+                        (unsigned)seqNumber, (int)encodedLen);
         }
 
         ++seqNumber;
