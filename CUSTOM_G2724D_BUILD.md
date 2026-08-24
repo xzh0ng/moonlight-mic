@@ -7,10 +7,10 @@ and adds local monitor input switching directly to Moonlight.
 
 - After a stream named **Remote Input + Audio** connects successfully,
   Moonlight activates itself, raises the SDL streaming window, waits briefly
-  for macOS focus ordering, and switches display index 1 to DP1.
+  for macOS focus ordering, and switches the G2724D to DP1.
 - Other Moonlight applications never trigger an automatic display switch.
-- `Command-Control-G` switches display index 1 to DP1.
-- `Option-Control-G` switches display index 1 to HDMI 1.
+- `Command-Control-G` switches the G2724D to DP1.
+- `Option-Control-G` switches the G2724D to HDMI 1.
 - **Remote Input + Audio** always starts in relative/FPS mouse mode for
   unrestricted camera turning, regardless of the saved global remote-desktop
   mouse preference. `Control-Option-Shift-M` remains available as a temporary
@@ -22,8 +22,10 @@ and adds local monitor input switching directly to Moonlight.
   moves its UI away from any offline screen, and raises it on the Mac desktop.
 - DP1 is DDC input value 15; HDMI 1 is DDC input value 17.
 - Monitor commands are serialized and executed directly without a shell.
-- The packaged app contains the MIT-licensed `m1ddc` 1.2.0 arm64 binary in
-  `Contents/Resources`, with Homebrew locations used only as a fallback.
+- When BetterDisplay is installed, Moonlight targets the physical G2724D by
+  name through BetterDisplay's DDC command, avoiding virtual-display ordering.
+- Without BetterDisplay, the packaged MIT-licensed `m1ddc` 1.2.0 arm64 binary
+  is used for the original single-display setup.
 
 Quit the standalone **G2724D Input Switcher** before starting this Moonlight
 build. macOS only permits one application to own a global shortcut, so leaving
@@ -49,7 +51,7 @@ audio back to Windows. Otherwise a feedback loop can occur.
 
 The current artifact is an arm64 build for Apple Silicon. Focused Qt tests cover
 settings persistence, mic capability gating, mic lifecycle, the automatic
-application-name gate, and exact `m1ddc` arguments.
+application-name gate, and exact BetterDisplay and `m1ddc` arguments.
 
 The packaged DMG is:
 

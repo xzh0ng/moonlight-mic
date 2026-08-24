@@ -7,9 +7,7 @@ namespace DisplayInputPolicy {
 
 constexpr int InputDp1 = 15;
 constexpr int InputHdmi1 = 17;
-// Address the physical monitor by its stable CoreGraphics UUID. Numeric m1ddc
-// positions change when BetterDisplay adds or removes virtual screens.
-constexpr char DisplayUuid[] = "425C0628-3B6A-481D-95FC-695F1E5EFB71";
+constexpr int M1ddcFallbackDisplayIndex = 1;
 
 inline bool isRemoteInputAudioApplication(const QString& applicationName)
 {
@@ -29,10 +27,20 @@ inline QStringList m1ddcArguments(int inputValue)
 {
     return {
         QStringLiteral("display"),
-        QString::fromLatin1(DisplayUuid),
+        QString::number(M1ddcFallbackDisplayIndex),
         QStringLiteral("set"),
         QStringLiteral("input"),
         QString::number(inputValue),
+    };
+}
+
+inline QStringList betterDisplayArguments(int inputValue)
+{
+    return {
+        QStringLiteral("set"),
+        QStringLiteral("-namelike=G2724D"),
+        QStringLiteral("-ddc=%1").arg(inputValue),
+        QStringLiteral("-vcp=inputSelect"),
     };
 }
 

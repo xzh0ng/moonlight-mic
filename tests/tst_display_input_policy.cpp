@@ -21,11 +21,16 @@ private slots:
     void testM1ddcPacketArguments()
     {
         QCOMPARE(DisplayInputPolicy::m1ddcArguments(DisplayInputPolicy::InputDp1),
-                 QStringList({"display", "425C0628-3B6A-481D-95FC-695F1E5EFB71",
-                              "set", "input", "15"}));
+                 QStringList({"display", "1", "set", "input", "15"}));
         QCOMPARE(DisplayInputPolicy::m1ddcArguments(DisplayInputPolicy::InputHdmi1),
-                 QStringList({"display", "425C0628-3B6A-481D-95FC-695F1E5EFB71",
-                              "set", "input", "17"}));
+                 QStringList({"display", "1", "set", "input", "17"}));
+
+        QCOMPARE(DisplayInputPolicy::betterDisplayArguments(DisplayInputPolicy::InputDp1),
+                 QStringList({"set", "-namelike=G2724D", "-ddc=15",
+                              "-vcp=inputSelect"}));
+        QCOMPARE(DisplayInputPolicy::betterDisplayArguments(DisplayInputPolicy::InputHdmi1),
+                 QStringList({"set", "-namelike=G2724D", "-ddc=17",
+                              "-vcp=inputSelect"}));
     }
 
     void testRemoteInputAudioForcesRelativeMouseMode()

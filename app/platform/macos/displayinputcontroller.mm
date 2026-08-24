@@ -162,8 +162,9 @@ void DisplayInputController::requestInput(int inputValue, const char* reason)
         m_PendingInput = inputValue;
         m_PendingReason = QString::fromUtf8(reason);
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Display input: queued input %d while m1ddc is active",
-                    inputValue);
+                    "Display input: queued input %d while %s is active",
+                    inputValue,
+                    qPrintable(m_ActiveBackend));
         return;
     }
     startInputRequest(inputValue, reason);
@@ -171,18 +172,29 @@ void DisplayInputController::requestInput(int inputValue, const char* reason)
 
 void DisplayInputController::startInputRequest(int inputValue, const char* reason)
 {
-    QString executable = locateM1ddc();
+    QString executable = locateBetterDisplay();
+    QStringList arguments;
+    if (!executable.isEmpty()) {
+        m_ActiveBackend = QStringLiteral("BetterDisplay");
+        arguments = DisplayInputPolicy::betterDisplayArguments(inputValue);
+    }
+    else {
+        executable = locateM1ddc();
+        m_ActiveBackend = QStringLiteral("m1ddc");
+        arguments = DisplayInputPolicy::m1ddcArguments(inputValue);
+    }
+
     if (executable.isEmpty()) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Display input: m1ddc not found; cannot switch to input %d",
+                    "Display input: no DDC backend found; cannot switch to input %d",
                     inputValue);
         return;
     }
 
-    const QStringList arguments = DisplayInputPolicy::m1ddcArguments(inputValue);
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Display input: switching DELL G2724D by UUID to input %d (%s)",
+                "Display input: switching DELL G2724D to input %d via %s (%s)",
                 inputValue,
+                qPrintable(m_ActiveBackend),
                 reason);
     m_Process.setProgram(executable);
     m_Process.setArguments(arguments);
@@ -193,12 +205,14 @@ void DisplayInputController::handleProcessFinished(int exitCode, QProcess::ExitS
 {
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Display input: m1ddc completed successfully");
+                    "Display input: %s completed successfully",
+                    qPrintable(m_ActiveBackend));
     }
     else {
         const QByteArray errorText = m_Process.readAllStandardError().trimmed();
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Display input: m1ddc failed (exitCode=%d status=%d): %s",
+                    "Display input: %s failed (exitCode=%d status=%d): %s",
+                    qPrintable(m_ActiveBackend),
                     exitCode,
                     static_cast<int>(exitStatus),
                     errorText.constData());
@@ -209,7 +223,8 @@ void DisplayInputController::handleProcessFinished(int exitCode, QProcess::ExitS
 void DisplayInputController::handleProcessError(QProcess::ProcessError error)
 {
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                "Display input: failed to execute m1ddc (error=%d): %s",
+                "Display input: failed to execute %s (error=%d): %s",
+                qPrintable(m_ActiveBackend),
                 static_cast<int>(error),
                 qPrintable(m_Process.errorString()));
     if (m_Process.state() == QProcess::NotRunning) {
@@ -310,6 +325,13 @@ QString DisplayInputController::locateM1ddc() const
         }
     }
     return {};
+}
+
+QString DisplayInputController::locateBetterDisplay() const
+{
+    const QString executable = QStringLiteral(
+        "/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay");
+    return QFileInfo(executable).isExecutable() ? executable : QString();
 }
 
 void DisplayInputController::registerGlobalHotkeys()

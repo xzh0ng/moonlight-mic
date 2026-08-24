@@ -43,11 +43,13 @@ private:
     void startPendingRequest();
     void activateStreamingWindow();
     void restoreMoonlightUi();
+    QString locateBetterDisplay() const;
     QString locateM1ddc() const;
 
     QProcess m_Process;
     std::optional<int> m_PendingInput;
     QString m_PendingReason;
+    QString m_ActiveBackend;
     QMetaObject::Connection m_SessionFinishedConnection;
     void* m_EventHandler = nullptr;
     void* m_Dp1Hotkey = nullptr;
