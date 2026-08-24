@@ -1024,6 +1024,89 @@ Flickable {
         }
 
         GroupBox {
+            id: displayInputSettingsGroupBox
+            width: (parent.width - (parent.leftPadding + parent.rightPadding))
+            padding: 12
+            visible: Qt.platform.os === "osx"
+            title: "<font color=\"skyblue\">" + qsTr("Monitor Input Switching") + "</font>"
+            font.pointSize: 12
+
+            Column {
+                anchors.fill: parent
+                spacing: 5
+
+                ListModel {
+                    id: displayInputListModel
+                    ListElement { text: qsTr("DisplayPort 1"); val: StreamingPreferences.DI_DP1 }
+                    ListElement { text: qsTr("DisplayPort 2"); val: StreamingPreferences.DI_DP2 }
+                    ListElement { text: qsTr("HDMI 1"); val: StreamingPreferences.DI_HDMI1 }
+                    ListElement { text: qsTr("HDMI 2"); val: StreamingPreferences.DI_HDMI2 }
+                    ListElement { text: qsTr("USB-C"); val: StreamingPreferences.DI_USBC }
+                }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Windows input")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                AutoResizingComboBox {
+                    Component.onCompleted: {
+                        for (var i = 0; i < displayInputListModel.count; i++) {
+                            if (displayInputListModel.get(i).val === StreamingPreferences.windowsDisplayInput) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                    }
+
+                    id: windowsDisplayInputComboBox
+                    textRole: "text"
+                    model: displayInputListModel
+                    onActivated: {
+                        StreamingPreferences.windowsDisplayInput = displayInputListModel.get(currentIndex).val
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Moonlight switches to this input when Remote Input + Audio starts or Command-Control-G is pressed.")
+                }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Mac input")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                AutoResizingComboBox {
+                    Component.onCompleted: {
+                        for (var i = 0; i < displayInputListModel.count; i++) {
+                            if (displayInputListModel.get(i).val === StreamingPreferences.macDisplayInput) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                    }
+
+                    id: macDisplayInputComboBox
+                    textRole: "text"
+                    model: displayInputListModel
+                    onActivated: {
+                        StreamingPreferences.macDisplayInput = displayInputListModel.get(currentIndex).val
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Moonlight switches to this input when Option-Control-G is pressed.")
+                }
+            }
+        }
+
+        GroupBox {
             id: hostSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))
             padding: 12

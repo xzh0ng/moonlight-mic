@@ -7,20 +7,22 @@ and adds local monitor input switching directly to Moonlight.
 
 - After a stream named **Remote Input + Audio** connects successfully,
   Moonlight activates itself, raises the SDL streaming window, waits briefly
-  for macOS focus ordering, and switches the G2724D to DP1.
+  for macOS focus ordering, and switches the G2724D to the configured Windows
+  input.
 - Other Moonlight applications never trigger an automatic display switch.
-- `Command-Control-G` switches the G2724D to DP1.
-- `Option-Control-G` switches the G2724D to HDMI 1.
+- `Command-Control-G` switches the G2724D to the configured Windows input.
+- `Option-Control-G` switches the G2724D to the configured Mac input.
 - **Remote Input + Audio** always starts in relative/FPS mouse mode for
   unrestricted camera turning, regardless of the saved global remote-desktop
   mouse preference. `Control-Option-Shift-M` remains available as a temporary
   in-stream mode toggle.
-- After `Option-Control-G` switches to HDMI 1, Moonlight cleanly ends only the
+- After `Option-Control-G` switches to the Mac input, Moonlight cleanly ends only the
   active stream and returns to its normal UI. Moonlight and Apollo stay open,
   making it quick to launch **Remote Input + Audio** again.
-- After the stream ends, Moonlight waits for macOS to publish the HDMI display,
+- After the stream ends, Moonlight waits for macOS to publish the Mac display,
   moves its UI away from any offline screen, and raises it on the Mac desktop.
-- DP1 is DDC input value 15; HDMI 1 is DDC input value 17.
+- Supported inputs are DP1, DP2, HDMI1, HDMI2, and USB-C. The defaults are
+  Windows on HDMI1 and Mac on DP1.
 - Monitor commands are serialized and executed directly without a shell.
 - When BetterDisplay is installed, Moonlight targets the physical G2724D by
   name through BetterDisplay's DDC command, avoiding virtual-display ordering.
@@ -50,6 +52,10 @@ input switching whenever it is installed.
 6. If BetterDisplay's 14-day Pro trial is active, verify this setup works in
    free mode by disabling **Licensing & Pro Features** under **Settings >
    Application > Advanced settings & privacy**.
+7. In Moonlight, open **Settings > Monitor Input Switching** and select the
+   ports currently connected to the Windows PC and Mac. These choices persist
+   between launches, so moving either computer only requires updating these
+   two settings.
 
 No separate BetterDisplay command-line tool, HTTP server, or paid license is
 required. Moonlight selects the physical monitor by the name `G2724D`, so the
@@ -59,14 +65,15 @@ After installing this Moonlight build, start **Remote Input + Audio**. A
 successful automatic switch contains these log entries:
 
 ```text
-Display input: switching DELL G2724D to input 15 via BetterDisplay
+Display input: switching DELL G2724D to input 17 via BetterDisplay
 Display input: BetterDisplay completed successfully
 ```
 
-Press `Option-Control-G` to return to HDMI 1. The corresponding successful log
-uses input value `17`. If BetterDisplay is not installed, Moonlight falls back
-to bundled `m1ddc`, which is intended only for the original single-display
-setup without a virtual screen.
+With the default wiring, the automatic Windows switch uses input value `17`
+(HDMI1), and `Option-Control-G` returns to input value `15` (DP1). If
+BetterDisplay is not installed, Moonlight falls back to bundled `m1ddc`, which
+is intended only for the original single-display setup without a virtual
+screen.
 
 ## Microphone permission
 

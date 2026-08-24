@@ -14,12 +14,13 @@
 #include <AppKit/AppKit.h>
 
 #include "SDL_compat.h"
+#include "settings/streamingpreferences.h"
 #include "streaming/session.h"
 
 namespace {
 
-constexpr EventHotKeyID kDp1HotkeyId = { 'MLDD', 1 };
-constexpr EventHotKeyID kHdmiHotkeyId = { 'MLDD', 2 };
+constexpr EventHotKeyID kWindowsHotkeyId = { 'MLDD', 1 };
+constexpr EventHotKeyID kMacHotkeyId = { 'MLDD', 2 };
 
 OSStatus globalHotkeyHandler(EventHandlerCallRef, EventRef event, void* userData)
 {
@@ -31,17 +32,17 @@ OSStatus globalHotkeyHandler(EventHandlerCallRef, EventRef event, void* userData
                                         sizeof(hotkeyId),
                                         nullptr,
                                         &hotkeyId);
-    if (status != noErr || hotkeyId.signature != kDp1HotkeyId.signature) {
+    if (status != noErr || hotkeyId.signature != kWindowsHotkeyId.signature) {
         return eventNotHandledErr;
     }
 
     auto* controller = static_cast<DisplayInputController*>(userData);
-    if (hotkeyId.id == kDp1HotkeyId.id) {
-        QMetaObject::invokeMethod(controller, "switchToDp1", Qt::QueuedConnection);
+    if (hotkeyId.id == kWindowsHotkeyId.id) {
+        QMetaObject::invokeMethod(controller, "switchToWindows", Qt::QueuedConnection);
         return noErr;
     }
-    if (hotkeyId.id == kHdmiHotkeyId.id) {
-        QMetaObject::invokeMethod(controller, "switchToHdmi1", Qt::QueuedConnection);
+    if (hotkeyId.id == kMacHotkeyId.id) {
+        QMetaObject::invokeMethod(controller, "switchToMac", Qt::QueuedConnection);
         return noErr;
     }
     return eventNotHandledErr;
@@ -96,35 +97,38 @@ void DisplayInputController::scheduleAutomaticSwitch(const QString& applicationN
     }
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Display input: Remote Input + Audio connected; scheduling DP1 switch");
+                "Display input: Remote Input + Audio connected; scheduling Windows input switch");
     QTimer::singleShot(500, this, [this]() {
         activateStreamingWindow();
         QTimer::singleShot(150, this, [this]() {
-            requestInput(InputDp1, "Remote Input + Audio connected");
+            requestInput(static_cast<int>(StreamingPreferences::get()->windowsDisplayInput),
+                         "Remote Input + Audio connected");
         });
     });
 }
 
-void DisplayInputController::switchToDp1()
+void DisplayInputController::switchToWindows()
 {
     activateStreamingWindow();
     QTimer::singleShot(150, this, [this]() {
-        requestInput(InputDp1, "Command-Control-G hotkey");
+        requestInput(static_cast<int>(StreamingPreferences::get()->windowsDisplayInput),
+                     "Command-Control-G hotkey");
     });
 }
 
-void DisplayInputController::switchToHdmi1()
+void DisplayInputController::switchToMac()
 {
-    requestInput(InputHdmi1, "Option-Control-G hotkey");
+    requestInput(static_cast<int>(StreamingPreferences::get()->macDisplayInput),
+                 "Option-Control-G hotkey");
 
     // Return to the Mac input, then cleanly tear down only the compatibility
-    // stream. Moonlight stays open at its normal UI for a quick return to DP1.
+    // stream. Moonlight stays open at its normal UI for a quick return to Windows.
     // The Apollo host application also remains running.
     QTimer::singleShot(250, this, []() {
         Session* session = Session::get();
         if (session != nullptr) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Display input: HDMI return requested; ending stream and keeping Moonlight open");
+                        "Display input: Mac return requested; ending stream and keeping Moonlight open");
             DisplayInputController* controller = DisplayInputController::instance();
             if (controller != nullptr) {
                 QObject::disconnect(controller->m_SessionFinishedConnection);
@@ -139,7 +143,7 @@ void DisplayInputController::switchToHdmi1()
         }
         else {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Display input: HDMI return requested without active session; Moonlight remains open");
+                        "Display input: Mac return requested without active session; Moonlight remains open");
         }
     });
 }
@@ -158,6 +162,14 @@ void DisplayInputController::handleSessionFinished(int portTestResult)
 
 void DisplayInputController::requestInput(int inputValue, const char* reason)
 {
+    if (!DisplayInputPolicy::isSupportedInput(inputValue)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Display input: refusing unsupported DDC input value %d (%s)",
+                    inputValue,
+                    reason);
+        return;
+    }
+
     if (m_Process.state() != QProcess::NotRunning) {
         m_PendingInput = inputValue;
         m_PendingReason = QString::fromUtf8(reason);
@@ -255,7 +267,7 @@ void DisplayInputController::activateStreamingWindow()
     }
     else {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Display input: DP1 requested without an active streaming window");
+                    "Display input: Windows input requested without an active streaming window");
     }
 }
 
@@ -352,15 +364,15 @@ void DisplayInputController::registerGlobalHotkeys()
     }
     m_EventHandler = handler;
 
-    EventHotKeyRef dp1Hotkey = nullptr;
+    EventHotKeyRef windowsHotkey = nullptr;
     status = RegisterEventHotKey(kVK_ANSI_G,
                                  cmdKey | controlKey,
-                                 kDp1HotkeyId,
+                                 kWindowsHotkeyId,
                                  GetApplicationEventTarget(),
                                  0,
-                                 &dp1Hotkey);
+                                 &windowsHotkey);
     if (status == noErr) {
-        m_Dp1Hotkey = dp1Hotkey;
+        m_WindowsHotkey = windowsHotkey;
     }
     else {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
@@ -369,15 +381,15 @@ void DisplayInputController::registerGlobalHotkeys()
                     static_cast<int>(status));
     }
 
-    EventHotKeyRef hdmiHotkey = nullptr;
+    EventHotKeyRef macHotkey = nullptr;
     status = RegisterEventHotKey(kVK_ANSI_G,
                                  optionKey | controlKey,
-                                 kHdmiHotkeyId,
+                                 kMacHotkeyId,
                                  GetApplicationEventTarget(),
                                  0,
-                                 &hdmiHotkey);
+                                 &macHotkey);
     if (status == noErr) {
-        m_HdmiHotkey = hdmiHotkey;
+        m_MacHotkey = macHotkey;
     }
     else {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
@@ -389,13 +401,13 @@ void DisplayInputController::registerGlobalHotkeys()
 
 void DisplayInputController::unregisterGlobalHotkeys()
 {
-    if (m_Dp1Hotkey != nullptr) {
-        UnregisterEventHotKey(static_cast<EventHotKeyRef>(m_Dp1Hotkey));
-        m_Dp1Hotkey = nullptr;
+    if (m_WindowsHotkey != nullptr) {
+        UnregisterEventHotKey(static_cast<EventHotKeyRef>(m_WindowsHotkey));
+        m_WindowsHotkey = nullptr;
     }
-    if (m_HdmiHotkey != nullptr) {
-        UnregisterEventHotKey(static_cast<EventHotKeyRef>(m_HdmiHotkey));
-        m_HdmiHotkey = nullptr;
+    if (m_MacHotkey != nullptr) {
+        UnregisterEventHotKey(static_cast<EventHotKeyRef>(m_MacHotkey));
+        m_MacHotkey = nullptr;
     }
     if (m_EventHandler != nullptr) {
         RemoveEventHandler(static_cast<EventHandlerRef>(m_EventHandler));

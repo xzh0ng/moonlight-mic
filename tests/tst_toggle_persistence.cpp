@@ -21,6 +21,8 @@
 
 static const char* kStreamMicKey = "streammic";
 static const char* kMicCaptureDeviceKey = "miccapturedevice";
+static const char* kWindowsDisplayInputKey = "windowsdisplayinput";
+static const char* kMacDisplayInputKey = "macdisplayinput";
 
 class TstTogglePersistence : public QObject
 {
@@ -63,6 +65,8 @@ private slots:
         QSettings settings;
         settings.remove(kStreamMicKey);
         settings.remove(kMicCaptureDeviceKey);
+        settings.remove(kWindowsDisplayInputKey);
+        settings.remove(kMacDisplayInputKey);
         settings.sync();
     }
 
@@ -125,6 +129,21 @@ private slots:
 
         QSettings settings2;
         QCOMPARE(settings2.value(kMicCaptureDeviceKey, QString()).toString(), deviceName);
+    }
+
+    void test_displayInputPersistence()
+    {
+        QSettings settings;
+        QCOMPARE(settings.value(kWindowsDisplayInputKey, 17).toInt(), 17);
+        QCOMPARE(settings.value(kMacDisplayInputKey, 15).toInt(), 15);
+
+        settings.setValue(kWindowsDisplayInputKey, 15);
+        settings.setValue(kMacDisplayInputKey, 17);
+        settings.sync();
+
+        QSettings settings2;
+        QCOMPARE(settings2.value(kWindowsDisplayInputKey, 17).toInt(), 15);
+        QCOMPARE(settings2.value(kMacDisplayInputKey, 15).toInt(), 17);
     }
 };
 

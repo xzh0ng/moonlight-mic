@@ -15,9 +15,6 @@ class DisplayInputController : public QObject
     Q_OBJECT
 
 public:
-    static constexpr int InputDp1 = DisplayInputPolicy::InputDp1;
-    static constexpr int InputHdmi1 = DisplayInputPolicy::InputHdmi1;
-
     explicit DisplayInputController(QObject* parent = nullptr);
     ~DisplayInputController() override;
 
@@ -27,8 +24,8 @@ public:
     void scheduleAutomaticSwitch(const QString& applicationName);
 
 public slots:
-    void switchToDp1();
-    void switchToHdmi1();
+    void switchToWindows();
+    void switchToMac();
 
 private slots:
     void handleProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -52,8 +49,8 @@ private:
     QString m_ActiveBackend;
     QMetaObject::Connection m_SessionFinishedConnection;
     void* m_EventHandler = nullptr;
-    void* m_Dp1Hotkey = nullptr;
-    void* m_HdmiHotkey = nullptr;
+    void* m_WindowsHotkey = nullptr;
+    void* m_MacHotkey = nullptr;
 
     static DisplayInputController* s_Instance;
 };

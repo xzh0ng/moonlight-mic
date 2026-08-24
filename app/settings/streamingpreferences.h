@@ -109,6 +109,16 @@ public:
     };
     Q_ENUM(CaptureSysKeysMode);
 
+    enum DisplayInput
+    {
+        DI_DP1 = 15,
+        DI_DP2 = 16,
+        DI_HDMI1 = 17,
+        DI_HDMI2 = 18,
+        DI_USBC = 27,
+    };
+    Q_ENUM(DisplayInput);
+
     Q_PROPERTY(int width MEMBER width NOTIFY displayModeChanged)
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
@@ -143,6 +153,8 @@ public:
     Q_PROPERTY(bool backgroundGamepad MEMBER backgroundGamepad NOTIFY backgroundGamepadChanged)
     Q_PROPERTY(bool streamMicToHost MEMBER streamMicToHost NOTIFY streamMicToHostChanged)
     Q_PROPERTY(QString micCaptureDevice MEMBER micCaptureDevice NOTIFY micCaptureDeviceChanged)
+    Q_PROPERTY(DisplayInput windowsDisplayInput MEMBER windowsDisplayInput NOTIFY windowsDisplayInputChanged)
+    Q_PROPERTY(DisplayInput macDisplayInput MEMBER macDisplayInput NOTIFY macDisplayInputChanged)
     Q_PROPERTY(bool reverseScrollDirection MEMBER reverseScrollDirection NOTIFY reverseScrollDirectionChanged)
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
     Q_PROPERTY(bool keepAwake MEMBER keepAwake NOTIFY keepAwakeChanged)
@@ -182,6 +194,8 @@ public:
     bool keepAwake;
     bool streamMicToHost;
     QString micCaptureDevice;
+    DisplayInput windowsDisplayInput;
+    DisplayInput macDisplayInput;
     int packetSize;
     AudioConfig audioConfig;
     VideoCodecConfig videoCodecConfig;
@@ -231,6 +245,8 @@ signals:
     void keepAwakeChanged();
     void streamMicToHostChanged();
     void micCaptureDeviceChanged();
+    void windowsDisplayInputChanged();
+    void macDisplayInputChanged();
     void languageChanged();
 
 private:
@@ -240,4 +256,3 @@ private:
 
     QQmlEngine* m_QmlEngine;
 };
-

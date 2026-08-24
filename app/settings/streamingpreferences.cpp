@@ -54,6 +54,8 @@
 #define SER_LANGUAGE "language"
 #define SER_STREAMMIC "streammic"
 #define SER_MIC_CAPTURE_DEVICE "miccapturedevice"
+#define SER_WINDOWS_DISPLAY_INPUT "windowsdisplayinput"
+#define SER_MAC_DISPLAY_INPUT "macdisplayinput"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -155,6 +157,10 @@ void StreamingPreferences::reload()
     keepAwake = settings.value(SER_KEEPAWAKE, true).toBool();
     streamMicToHost = settings.value(SER_STREAMMIC, false).toBool();
     micCaptureDevice = settings.value(SER_MIC_CAPTURE_DEVICE, QString()).toString();
+    windowsDisplayInput = static_cast<DisplayInput>(settings.value(
+        SER_WINDOWS_DISPLAY_INPUT, static_cast<int>(DisplayInput::DI_HDMI1)).toInt());
+    macDisplayInput = static_cast<DisplayInput>(settings.value(
+        SER_MAC_DISPLAY_INPUT, static_cast<int>(DisplayInput::DI_DP1)).toInt());
     enableHdr = settings.value(SER_HDR, false).toBool();
     captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS,
                                                          static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
@@ -397,6 +403,8 @@ void StreamingPreferences::save()
     settings.setValue(SER_KEEPAWAKE, keepAwake);
     settings.setValue(SER_STREAMMIC, streamMicToHost);
     settings.setValue(SER_MIC_CAPTURE_DEVICE, micCaptureDevice);
+    settings.setValue(SER_WINDOWS_DISPLAY_INPUT, static_cast<int>(windowsDisplayInput));
+    settings.setValue(SER_MAC_DISPLAY_INPUT, static_cast<int>(macDisplayInput));
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

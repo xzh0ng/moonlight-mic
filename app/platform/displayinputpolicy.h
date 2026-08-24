@@ -9,6 +9,12 @@ constexpr int InputDp1 = 15;
 constexpr int InputHdmi1 = 17;
 constexpr int M1ddcFallbackDisplayIndex = 1;
 
+inline bool isSupportedInput(int inputValue)
+{
+    return inputValue == 15 || inputValue == 16 || inputValue == 17 ||
+           inputValue == 18 || inputValue == 27;
+}
+
 inline bool isRemoteInputAudioApplication(const QString& applicationName)
 {
     return applicationName.trimmed().compare(QStringLiteral("Remote Input + Audio"),

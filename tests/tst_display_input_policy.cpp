@@ -31,6 +31,27 @@ private slots:
         QCOMPARE(DisplayInputPolicy::betterDisplayArguments(DisplayInputPolicy::InputHdmi1),
                  QStringList({"set", "-namelike=G2724D", "-ddc=17",
                               "-vcp=inputSelect"}));
+
+        QCOMPARE(DisplayInputPolicy::betterDisplayArguments(16),
+                 QStringList({"set", "-namelike=G2724D", "-ddc=16",
+                              "-vcp=inputSelect"}));
+        QCOMPARE(DisplayInputPolicy::betterDisplayArguments(18),
+                 QStringList({"set", "-namelike=G2724D", "-ddc=18",
+                              "-vcp=inputSelect"}));
+        QCOMPARE(DisplayInputPolicy::betterDisplayArguments(27),
+                 QStringList({"set", "-namelike=G2724D", "-ddc=27",
+                              "-vcp=inputSelect"}));
+    }
+
+    void testSupportedDisplayInputs()
+    {
+        QVERIFY(DisplayInputPolicy::isSupportedInput(15));
+        QVERIFY(DisplayInputPolicy::isSupportedInput(16));
+        QVERIFY(DisplayInputPolicy::isSupportedInput(17));
+        QVERIFY(DisplayInputPolicy::isSupportedInput(18));
+        QVERIFY(DisplayInputPolicy::isSupportedInput(27));
+        QVERIFY(!DisplayInputPolicy::isSupportedInput(0));
+        QVERIFY(!DisplayInputPolicy::isSupportedInput(19));
     }
 
     void testRemoteInputAudioForcesRelativeMouseMode()
