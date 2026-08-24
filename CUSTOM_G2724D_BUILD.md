@@ -31,6 +31,43 @@ Quit the standalone **G2724D Input Switcher** before starting this Moonlight
 build. macOS only permits one application to own a global shortcut, so leaving
 the old switcher open prevents Moonlight from registering the same shortcuts.
 
+## BetterDisplay setup
+
+The free BetterDisplay features are sufficient for this setup. BetterDisplay
+must remain running because Moonlight uses its executable directly for DDC
+input switching whenever it is installed.
+
+1. Install **BetterDisplay.app** in `/Applications` and open it.
+2. Create a basic 16:9 virtual screen and leave it connected. A 2560x1440
+   virtual screen matches the G2724D; 60 Hz is sufficient because this screen
+   only keeps the macOS desktop and Moonlight input capture alive.
+3. Do not associate the virtual screen with the G2724D or configure it to
+   disconnect when the physical display disappears. It must stay online after
+   the monitor changes to DP1.
+4. Enable BetterDisplay at login so the virtual screen and DDC backend are
+   available before Moonlight starts.
+5. In the G2724D on-screen menu, ensure **DDC/CI** is enabled.
+6. If BetterDisplay's 14-day Pro trial is active, verify this setup works in
+   free mode by disabling **Licensing & Pro Features** under **Settings >
+   Application > Advanced settings & privacy**.
+
+No separate BetterDisplay command-line tool, HTTP server, or paid license is
+required. Moonlight selects the physical monitor by the name `G2724D`, so the
+virtual screen cannot change the target through display-number reordering.
+
+After installing this Moonlight build, start **Remote Input + Audio**. A
+successful automatic switch contains these log entries:
+
+```text
+Display input: switching DELL G2724D to input 15 via BetterDisplay
+Display input: BetterDisplay completed successfully
+```
+
+Press `Option-Control-G` to return to HDMI 1. The corresponding successful log
+uses input value `17`. If BetterDisplay is not installed, Moonlight falls back
+to bundled `m1ddc`, which is intended only for the original single-display
+setup without a virtual screen.
+
 ## Microphone permission
 
 The bundle includes `NSMicrophoneUsageDescription`. After installing the app:
