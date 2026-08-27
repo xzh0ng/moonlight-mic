@@ -48,6 +48,19 @@ private:
             return false;
         }
 
+        // A response reached through an explicitly configured manual address may
+        // report the VPN adapter as the host's local address and MAC. Those values
+        // are useful for the live connection, but they must not replace the LAN
+        // metadata used for Wake-on-LAN.
+        {
+            QReadLocker lock(&m_Computer->lock);
+            if (!m_Computer->manualAddress.isNull() &&
+                    address == m_Computer->manualAddress) {
+                newState.localAddress = m_Computer->localAddress;
+                newState.macAddress = m_Computer->macAddress;
+            }
+        }
+
         changed = m_Computer->update(newState);
         return true;
     }
@@ -933,6 +946,24 @@ private:
             }
 
             if (existingComputer != nullptr) {
+                // Discovery is allowed to refresh LAN/WOL metadata, but it must
+                // not silently undo an explicit manual connection preference.
+                // The monitor thread will change activeAddress itself when it
+                // actually has to fall back after the manual address fails.
+                if (m_Mdns) {
+                    QReadLocker computerLock(&existingComputer->lock);
+                    if (!existingComputer->manualAddress.isNull()) {
+                        newComputer->activeAddress = existingComputer->activeAddress;
+
+                        // mDNS may also arrive over the VPN interface. Preserve
+                        // physical Wake-on-LAN metadata in that case.
+                        if (m_Address == existingComputer->manualAddress) {
+                            newComputer->localAddress = existingComputer->localAddress;
+                            newComputer->macAddress = existingComputer->macAddress;
+                        }
+                    }
+                }
+
                 // Fold it into the existing PC
                 bool changed = existingComputer->update(*newComputer);
                 delete newComputer;

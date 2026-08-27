@@ -1,4 +1,4 @@
-QT += core testlib
+QT += core network testlib
 CONFIG += c++17 console testcase debug_and_release
 CONFIG -= app_bundle
 
@@ -18,13 +18,17 @@ SOURCES += \
     tst_gate_logic.cpp \
     tst_mic_lifecycle.cpp \
     tst_display_input_policy.cpp \
+    tst_address_selection_policy.cpp \
     stub_limelight.cpp \
     gate_helper_impl.cpp \
+    ../app/backend/nvaddress.cpp \
     ../app/streaming/audio/MicAudioSender.cpp
 
 HEADERS += \
     ../app/streaming/session_gate_helper.h \
     ../app/streaming/audio/MicAudioSender.h \
+    ../app/backend/addressselectionpolicy.h \
+    ../app/backend/nvaddress.h \
     ../app/SDL_compat.h \
     ../app/utils.h
 

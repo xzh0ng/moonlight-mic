@@ -1,5 +1,6 @@
 #include "nvcomputer.h"
 #include "nvapp.h"
+#include "addressselectionpolicy.h"
 #include "settings/compatfetcher.h"
 
 #include <QUdpSocket>
@@ -485,30 +486,13 @@ bool NvComputer::updateAppList(QVector<NvApp> newAppList) {
 QVector<NvAddress> NvComputer::uniqueAddresses() const
 {
     QReadLocker readLocker(&lock);
-    QVector<NvAddress> uniqueAddressList;
 
-    // Start with addresses correctly ordered
-    uniqueAddressList.append(activeAddress);
-    uniqueAddressList.append(localAddress);
-    uniqueAddressList.append(remoteAddress);
-    uniqueAddressList.append(ipv6Address);
-    uniqueAddressList.append(manualAddress);
-
-    // Prune duplicates (always giving precedence to the first)
-    for (int i = 0; i < uniqueAddressList.count(); i++) {
-        if (uniqueAddressList[i].isNull()) {
-            uniqueAddressList.remove(i);
-            i--;
-            continue;
-        }
-        for (int j = i + 1; j < uniqueAddressList.count(); j++) {
-            if (uniqueAddressList[i] == uniqueAddressList[j]) {
-                // Always remove the later occurrence
-                uniqueAddressList.remove(j);
-                j--;
-            }
-        }
-    }
+    const QVector<NvAddress> uniqueAddressList =
+        AddressSelectionPolicy::orderedUniqueAddresses(manualAddress,
+                                                       activeAddress,
+                                                       localAddress,
+                                                       remoteAddress,
+                                                       ipv6Address);
 
     // We must have at least 1 address
     Q_ASSERT(!uniqueAddressList.isEmpty());

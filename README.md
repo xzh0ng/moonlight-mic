@@ -46,6 +46,75 @@ You can follow development on our [Discord server](https://moonlight-stream.org/
 
 Hosting for Moonlight's Debian and L4T package repositories is graciously provided for free by [Cloudsmith](https://cloudsmith.com).
 
+## ZeroTier Ethernet/Wi-Fi redundancy
+
+This custom build can prefer a manually configured ZeroTier address for the
+Moonlight session while retaining Apollo's discovered physical LAN address and
+MAC address for Wake-on-LAN. The IP addresses are not compiled into Moonlight:
+the ZeroTier address is the host's persisted manual address, and the LAN
+address is learned through normal discovery and `serverinfo` polling.
+
+On a Mac where Ethernet is `en8` and Wi-Fi is `en1`, the following ZeroTier
+active-backup policy has been verified to prefer Ethernet, fail over to Wi-Fi,
+and return to Ethernet after it reconnects. Save it as:
+
+```text
+/Library/Application Support/ZeroTier/One/local.conf
+```
+
+```json
+{
+  "settings": {
+    "defaultBondingPolicy": "moonlight-active-backup",
+    "policies": {
+      "moonlight-active-backup": {
+        "basePolicy": "active-backup",
+        "linkSelectMethod": "always",
+        "failoverInterval": 250,
+        "links": {
+          "en8": {
+            "mode": "primary",
+            "failoverTo": "en1"
+          },
+          "en1": {
+            "mode": "spare"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Change `en8` and `en1` if macOS uses different interface names. Check them
+with `networksetup -listallhardwareports` or `ifconfig` before applying the
+configuration. Restart ZeroTier after every `local.conf` change:
+
+```bash
+sudo launchctl kickstart -k system/com.zerotier.one
+```
+
+Confirm that ZeroTier loaded the policy and formed paths over both interfaces:
+
+```bash
+sudo "/Library/Application Support/ZeroTier/One/zerotier-cli" bond list
+sudo "/Library/Application Support/ZeroTier/One/zerotier-cli" bond <WINDOWS_PEER_ID> show
+```
+
+The peer details should report `active-backup`, show eligible paths for both
+`en8` and `en1`, and identify Ethernet as the primary link. With
+`linkSelectMethod` set to `always`, ZeroTier selects `en8` again after Ethernet
+returns. `failoverInterval` controls failure detection; the working value above
+is 250 ms.
+
+In Moonlight, add or pair the PC normally so its physical LAN and WOL metadata
+are learned, then configure the PC's ZeroTier IP as its manual address. The
+custom address-selection order is manual, active, LAN, remote, then IPv6. A
+reachable manual ZeroTier address therefore carries the stream, while the LAN
+address and physical MAC remain available for Wake-on-LAN. If the ZeroTier IP
+changes, update the saved manual address; it is persisted configuration rather
+than a hardcoded or automatically allocated address in the Moonlight binary.
+
 ## Building
 
 ### Windows Build Requirements
